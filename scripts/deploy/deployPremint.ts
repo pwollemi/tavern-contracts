@@ -3,7 +3,7 @@ import { deployContract, deployProxy } from "../../helper/deployer";
 
 import ERC20 from '../../abis/ERC20.json';
 import { sleep } from "../../helper/utils";
-import { PRESALE_MAINNET, PRESALE_TESTNET, USDC_MAINNET, USDC_TESTNET, XMEAD_MAINNET, XMEAD_TESTNET } from "../ADDRESSES";
+import { PREMINT_FORKED_MAINNET, PRESALE_MAINNET, PRESALE_TESTNET, USDC_MAINNET, USDC_TESTNET, XMEAD_MAINNET, XMEAD_TESTNET } from "../ADDRESSES";
 import { Brewery_address, xMead_address } from "../NFT_ADDRESSES";
 
 async function main() {
@@ -22,14 +22,19 @@ async function main() {
 
     // Deploy the premint contract
     const Premint = await deployProxy("Premint", breweryAddress, xMeadAddress, usdcAddress, whitelistPresaleAddress);
-    await Premint.addBatch('2000', 100 * 10**usdcDecimals);
-    await Premint.addBatch('1600', 100 * 10**usdcDecimals);
-    await Premint.addBatch('1200', 100 * 10**usdcDecimals);
-    await Premint.addBatch('800', 100 * 10**usdcDecimals);
-    await Premint.addBatch('400', 100 * 10**usdcDecimals);
+    await Premint.addBatch('10', 100 * 10**usdcDecimals);
+    await Premint.addBatch('5', 200 * 10**usdcDecimals);
+    await Premint.addBatch('3', 300 * 10**usdcDecimals);
+    await Premint.addBatch('2', 400 * 10**usdcDecimals);
+    await Premint.addBatch('1', 500 * 10**usdcDecimals);
     await Premint.setWhitelistBatch('3600', whitelistLimit);
 
     console.log("Premint contract deployed!", Premint.address);
+
+    // Let the premint contract mint BREWERYs
+    const Brewery = await ethers.getContractAt("Brewery", Brewery_address)
+    await Brewery.connect(deployer).grantRole(await Brewery.MINTER_ROLE(), Premint.address);
+    console.log(`Premint contract (${Premint.address}) is enabled to mint BREWERYs!`);
 }
 
 main()

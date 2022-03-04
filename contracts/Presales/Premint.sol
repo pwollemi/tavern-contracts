@@ -284,7 +284,7 @@ contract Premint is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         if (!isNextBatch) {
             require(batches[currentBatchIndex].minted + amount <= batches[currentBatchIndex].supply, "Reached end of supply");
         }
-        
+
         // Calculate price and redeem the users xMEAD
         uint256 price = settings.xMeadCost() * amount;
         xmead.redeem(msg.sender, price);
