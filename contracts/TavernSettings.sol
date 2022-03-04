@@ -41,6 +41,9 @@ contract TavernSettings is Initializable, OwnableUpgradeable {
     /// @notice The wallet address of the rewards pool
     address public rewardsPool;
 
+    /// @notice The wallet address of the xMead redeem treasury
+    address public redeemPool;
+
     /// @notice The fee that is given to treasuries
     uint256 public treasuryFee;
 
@@ -97,6 +100,9 @@ contract TavernSettings is Initializable, OwnableUpgradeable {
 
         // Default taxes
         classTaxes = _classTaxes;
+
+        treasuryFee = PRECISION * 70 / 100;
+        rewardPoolFee = PRECISION * 30 / 100;
     }
 
     /**
@@ -110,6 +116,10 @@ contract TavernSettings is Initializable, OwnableUpgradeable {
 
     function setRewardsPool(address _rewardsPool) external onlyOwner {
         rewardsPool = _rewardsPool;
+    }
+
+    function setRedeemPool(address _redeemPool) external onlyOwner {
+        redeemPool = _redeemPool;
     }
 
     function setTreasuryFee(uint256 _treasuryFee) external onlyOwner {

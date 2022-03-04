@@ -9,7 +9,10 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./TavernSettings.sol";
 import "./ERC-721/Brewery.sol";
 import "./ClassManager.sol";
-import "./xMeadRedeemHelper.sol";
+
+interface IxMEAD { 
+    function redeem(address, uint256) external;
+}
 
 /**
  * @notice There are some conditions to make this work
@@ -27,9 +30,6 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
     /// @notice Brewery contract
     Brewery public brewery;
 
-    /// @notice Used to give extra precision for percentages
-    uint256 public constant PRECISION = 1e10;
-
     /// @notice Whether or not the USDC payments have been enabled (based on the treasury)
     bool public isUSDCEnabled;
 
@@ -37,19 +37,19 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
     bool public isLPEnabled;
 
     /// @notice The amount of discount of USDC
-    uint256 public usdcDiscount = 5 * PRECISION;
+    uint256 public usdcDiscount;
     
     /// @notice The upper liquidity ratio (when to apply the higher discount)
-    uint256 public liquidityRatio0 = 20 * PRECISION;
+    uint256 public liquidityRatio0;
 
     /// @notice The lower liquidity ratio (when to apply the lower discount)
-    uint256 public liquidityRatio1 = 1 * PRECISION;
+    uint256 public liquidityRatio1;
 
     /// @notice The discount (to be applied when the liquidity ratio is equal to or above `liquidityRatio0`)
-    uint256 public lpDiscount0 = 1 * PRECISION;
+    uint256 public lpDiscount0;
 
     /// @notice The discount (to be applied when the liquidity ratio is equal to or less than `liquidityRatio1`)
-    uint256 public lpDiscount1 = 25 * PRECISION;
+    uint256 public lpDiscount1;
 
     /// @notice The amount of reputation gained for buying a BREWERY with MEAD
     uint256 public reputationForMead;
@@ -61,10 +61,10 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
     uint256 public reputationForLP;
 
     /// @notice Liquidity zapping slippage
-    uint256 public zapSlippage = 10 * PRECISION;
+    uint256 public zapSlippage;
 
     /// @notice The percentage fee for using the auto-zapping! 
-    uint256 public zapFee = 1 * PRECISION;
+    uint256 public zapFee;
 
     /// @notice Relevant events to emit
     event Redeemed(address account, uint256 amount);
@@ -75,6 +75,14 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         // Store the settings
         settings = TavernSettings(_settings);
         brewery = Brewery(_brewery);
+
+        usdcDiscount = 5 * settings.PRECISION() / 100;
+        liquidityRatio0 = 20 * settings.PRECISION() / 100;
+        liquidityRatio1 = 1 * settings.PRECISION() / 100;
+        lpDiscount0 = 1 * settings.PRECISION() / 100;
+        lpDiscount1 = 25 * settings.PRECISION() / 100;
+        zapSlippage = 10 * settings.PRECISION() / 100;
+        zapFee = 1 * settings.PRECISION() / 100;
     }
 
     /**
@@ -96,10 +104,10 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
      */
     function purchaseWithXMead(string memory name) external {
 
-        uint256 xMeadAmount = settings.xMeadCost() * getUSDCForMead() * ERC20Upgradeable(settings.mead()).decimals();
-        xMeadRedeemHelper(settings.redeemer()).redeem(xMeadAmount);
-        IERC20Upgradeable(settings.mead()).safeTransferFrom(msg.sender, settings.tavernsKeep(), xMeadAmount * settings.treasuryFee() / (100 * PRECISION));
-        IERC20Upgradeable(settings.mead()).safeTransferFrom(msg.sender, settings.rewardsPool(), xMeadAmount * settings.rewardPoolFee() / (100 * PRECISION));
+        uint256 xMeadAmount = settings.xMeadCost();
+        IxMEAD(settings.xmead()).redeem(msg.sender, xMeadAmount);
+        IERC20Upgradeable(settings.mead()).safeTransferFrom(settings.redeemPool(), settings.tavernsKeep(), xMeadAmount * settings.treasuryFee() / settings.PRECISION());
+        IERC20Upgradeable(settings.mead()).safeTransferFrom(settings.redeemPool(), settings.rewardsPool(), xMeadAmount * settings.rewardPoolFee() / settings.PRECISION());
 
         // Mint logic
         _mint(msg.sender, name, reputationForMead);
@@ -109,9 +117,9 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
      * @notice Purchases a BREWERY using MEAD
      */
     function purchaseWithMead(string memory name) external {
-        uint256 meadAmount = settings.breweryCost() * getUSDCForMead() * ERC20Upgradeable(settings.mead()).decimals();
-        IERC20Upgradeable(settings.mead()).safeTransferFrom(msg.sender, settings.tavernsKeep(), meadAmount * settings.treasuryFee() / (100 * PRECISION));
-        IERC20Upgradeable(settings.mead()).safeTransferFrom(msg.sender, settings.rewardsPool(), meadAmount * settings.rewardPoolFee() / (100 * PRECISION));
+        uint256 meadAmount = settings.breweryCost();
+        IERC20Upgradeable(settings.mead()).safeTransferFrom(msg.sender, settings.tavernsKeep(), meadAmount * settings.treasuryFee() / settings.PRECISION());
+        IERC20Upgradeable(settings.mead()).safeTransferFrom(msg.sender, settings.rewardsPool(), meadAmount * settings.rewardPoolFee() / settings.PRECISION());
 
         // Mint logic
         _mint(msg.sender, name, reputationForMead);
@@ -124,7 +132,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         require(isUSDCEnabled, "USDC discount off");
 
         // Take payment for USDC tokens
-        uint256 usdcAmount = settings.breweryCost() * getUSDCForMead() * (100 - usdcDiscount) / (100 * PRECISION);
+        uint256 usdcAmount = getUSDCForMead(settings.breweryCost()) * (settings.PRECISION() - usdcDiscount) / settings.PRECISION();
         IERC20Upgradeable(settings.usdc()).safeTransferFrom(msg.sender, settings.tavernsKeep(), usdcAmount);
 
         // Mint logic
@@ -140,9 +148,9 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         // Take payment in MEAD-USDC LP tokens
         uint256 discount = calculateLPDiscount();
         require(discount <= lpDiscount0, "LP discount off");
-        uint256 breweryPriceInUSDC = settings.breweryCost() * getUSDCForMead();
+        uint256 breweryPriceInUSDC = getUSDCForMead(settings.breweryCost());
         uint256 breweryPriceInLP = getLPFromUSDC(breweryPriceInUSDC);
-        settings.liquidityPair().transferFrom(msg.sender, settings.tavernsKeep(), breweryPriceInLP * ((100 * PRECISION - discount) / (100 * PRECISION)));
+        settings.liquidityPair().transferFrom(msg.sender, settings.tavernsKeep(), breweryPriceInLP * (settings.PRECISION() - discount) / settings.PRECISION());
 
         // Mint logic
         _mint(msg.sender, name, reputationForMead);
@@ -153,16 +161,16 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
      */
     function purchaseWithLPUsingZap(string memory name) external {
         uint256 discount = calculateLPDiscount();
-        uint256 discountMultiplier = ((100 * PRECISION - discount) / (100 * PRECISION));
-        uint256 zapFeeMultiplier = (100 * PRECISION + zapFee) / (100 * PRECISION);
+        uint256 discountMultiplier = ((settings.PRECISION() - discount) / (settings.PRECISION()));
+        uint256 zapFeeMultiplier = (settings.PRECISION() + zapFee) / (settings.PRECISION());
 
         // Get the price of a brewery as if it were valued at the LP tokens rate + a fee for automatically zapping for you
         // Bear in mind this will still be discounted even though we take an extra fee!
-        uint256 breweryPriceInUSDCWithLPDiscount = settings.breweryCost() * getUSDCForMead() * discountMultiplier * zapFeeMultiplier;
+        uint256 breweryPriceInUSDCWithLPDiscount = getUSDCForMead(settings.breweryCost()) * discountMultiplier * zapFeeMultiplier;
 
         /// @notice Handles the zapping of liquitity for us + an extra fee
         /// @dev The LP tokens will now be in the hands of the msg.sender
-        uint256 liquidityTokens = zapLiquidity(breweryPriceInUSDCWithLPDiscount * (100 * PRECISION + zapFee) / (100 * PRECISION));
+        uint256 liquidityTokens = zapLiquidity(breweryPriceInUSDCWithLPDiscount * (settings.PRECISION() + zapFee) / (settings.PRECISION()));
 
         // Send the tokens from the account transacting this function to the taverns keep
         settings.liquidityPair().transferFrom(msg.sender, settings.tavernsKeep(), liquidityTokens);
@@ -206,8 +214,8 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
             address(settings.usdc()),
             amounts[0],
             amounts[1],
-            amounts[0] * (100 * PRECISION - zapSlippage),
-            amounts[1] * (100 * PRECISION - zapSlippage),
+            amounts[0] * (settings.PRECISION() - zapSlippage) / settings.PRECISION(),
+            amounts[1] * (settings.PRECISION() - zapSlippage) / settings.PRECISION(),
             msg.sender,
             block.timestamp + 120
         );
@@ -220,10 +228,10 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
      */
     function calculateLPDiscount() public view returns (uint256) {
         (, uint usdcReserves,) = settings.liquidityPair().getReserves();
-        uint256 fullyDilutedValue = getUSDCForMead() * IERC20Upgradeable(settings.mead()).totalSupply();
+        uint256 fullyDilutedValue = getUSDCForOneMead() * IERC20Upgradeable(settings.mead()).totalSupply();
 
         // If this is 5% its bad, if this is 20% its good
-        uint256 liquidityRatio = usdcReserves / fullyDilutedValue;
+        uint256 liquidityRatio = usdcReserves * settings.PRECISION() / fullyDilutedValue / 100;
 
         // X is liquidity ratio       (y0 = 5      y1 = 20)
         // Y is discount              (x0 = 15     x1 =  1)
@@ -234,7 +242,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
      * @notice Calculates how much USDC 1 LP token is worth
      */
     function getUSDCForOneLP() public view returns (uint256) {
-        uint256 meadPrice = getUSDCForMead();
+        uint256 meadPrice = getUSDCForOneMead();
         uint256 lpSupply = settings.liquidityPair().totalSupply();
         (uint meadReserves, uint usdcReserves,) = settings.liquidityPair().getReserves();
         uint256 meadValue = meadReserves * meadPrice;
@@ -261,14 +269,21 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
     }
 
     /**
-     * @notice Returns how many USDC tokens you get for 1 MEAD
+     * @notice Returns how many USDC tokens you need for inputed meadAmount
      */
-    function getUSDCForMead() public view returns (uint256) {
+    function getUSDCForMead(uint256 meadAmount) public view returns (uint256) {
         address[] memory path = new address[](2);
-        path[0] = settings.mead();
-        path[1] = settings.usdc();
-        uint256[] memory amountsOut = settings.dexRouter().getAmountsIn(10 ** ERC20Upgradeable(settings.mead()).decimals(), path);
+        path[0] = settings.usdc();
+        path[1] = settings.mead();
+        uint256[] memory amountsOut = settings.dexRouter().getAmountsIn(meadAmount, path);
         return amountsOut[0];
+    }
+
+    /**
+     * @notice Returns how many USDC tokens you need for inputed meadAmount
+     */
+    function getUSDCForOneMead() public view returns (uint256) {
+        return getUSDCForMead(10 ** ERC20Upgradeable(settings.usdc()).decimals());
     }
 
     /**
@@ -285,23 +300,23 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
     }
 
     function setUSDCDiscount(uint256 _discount) external onlyOwner {
-        usdcDiscount = _discount * PRECISION;
+        usdcDiscount = _discount;
     }
 
     function setMinLiquidityDiscount(uint256 _discount) external onlyOwner {
-        lpDiscount0 = _discount * PRECISION;
+        lpDiscount0 = _discount;
     }
 
     function setMaxLiquidityDiscount(uint256 _discount) external onlyOwner {
-        lpDiscount1 = _discount * PRECISION;
+        lpDiscount1 = _discount;
     }
 
     function setMinLiquidityRatio(uint256 _ratio) external onlyOwner {
-        liquidityRatio1 = _ratio * PRECISION;
+        liquidityRatio1 = _ratio;
     }
 
     function setMaxLiquidityRatio(uint256 _ratio) external onlyOwner {
-        liquidityRatio0 = _ratio * PRECISION;
+        liquidityRatio0 = _ratio;
     }
 
     function setReputationForMead(uint256 _reputation) external onlyOwner {
