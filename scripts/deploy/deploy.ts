@@ -2,7 +2,7 @@ import { ethers } from "hardhat";
 import { deployContract, deployProxy } from "../../helper/deployer";
 
 import { dateString } from "../../helper/utils";
-import { TRADERJOE_ROUTER_MAINNET, USDC_MAINNET, XMEAD_MAINNET, XMEAD_TESTNET } from "../ADDRESSES";
+import { TRADERJOE_ROUTER_MAINNET, TreasuryAddress, USDC_MAINNET, XMEAD_MAINNET, XMEAD_TESTNET } from "../ADDRESSES";
 import { writeFileSync } from "fs";
 
 async function main() {
@@ -40,7 +40,7 @@ async function main() {
     console.log("settings", settings.address);
 
     // Configure settings
-    await settings.setTavernsKeep(deployer.address);
+    await settings.setTavernsKeep(TreasuryAddress);
     await settings.setRewardsPool(deployer.address);
     await settings.setTreasuryFee(ethers.utils.parseUnits("30", 2));
     await settings.setRewardPoolFee(ethers.utils.parseUnits("70", 2));

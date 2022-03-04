@@ -8,7 +8,7 @@ async function main() {
 
     const XMead = await ethers.getContractAt("XMead", xMead_address);
     await XMead.grantRole(await XMead.ISSUER_ROLE(), deployer.address);
-    await XMead.issue("0x1bA1d0F472f44c8f41f65CA10AB43A038969DF57", ethers.utils.parseUnits("10000", await XMead.decimals()))
+    await XMead.issue("0xc198CAe628C26076Cf94D1bfDf67E021D908646D", ethers.utils.parseUnits("10000", await XMead.decimals()))
 }
 
 main()

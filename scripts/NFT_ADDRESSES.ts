@@ -1,4 +1,4 @@
-// 4/3/2022 @ 17:20:49
+// 4/3/2022 @ 17:52:48
 export const xMead_address = '0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf';
 export const Mead_address = '0x9d4454B023096f34B160D6B654540c56A1F81688';
 export const ClassManager_address = '0x36C02dA8a0983159322a80FFE9F24b1acfF8B570';
