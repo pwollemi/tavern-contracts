@@ -77,8 +77,8 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         brewery = Brewery(_brewery);
 
         usdcDiscount = 5 * settings.PRECISION() / 100;
-        liquidityRatio0 = 20 * settings.PRECISION() / 100;
-        liquidityRatio1 = 1 * settings.PRECISION() / 100;
+        liquidityRatio0 = 1 * settings.PRECISION() / 100;
+        liquidityRatio1 = 20 * settings.PRECISION() / 100;
         lpDiscount0 = 1 * settings.PRECISION() / 100;
         lpDiscount1 = 25 * settings.PRECISION() / 100;
         zapSlippage = 10 * settings.PRECISION() / 100;
@@ -147,7 +147,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
 
         // Take payment in MEAD-USDC LP tokens
         uint256 discount = calculateLPDiscount();
-        require(discount <= lpDiscount0, "LP discount off");
+        require(discount <= lpDiscount1, "LP discount off");
         uint256 breweryPriceInUSDC = getUSDCForMead(settings.breweryCost());
         uint256 breweryPriceInLP = getLPFromUSDC(breweryPriceInUSDC);
         settings.liquidityPair().transferFrom(msg.sender, settings.tavernsKeep(), breweryPriceInLP * (settings.PRECISION() - discount) / settings.PRECISION());
@@ -161,8 +161,8 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
      */
     function purchaseWithLPUsingZap(string memory name) external {
         uint256 discount = calculateLPDiscount();
-        uint256 discountMultiplier = ((settings.PRECISION() - discount) / (settings.PRECISION()));
-        uint256 zapFeeMultiplier = (settings.PRECISION() + zapFee) / (settings.PRECISION());
+        uint256 discountMultiplier = (settings.PRECISION() - discount) / settings.PRECISION();
+        uint256 zapFeeMultiplier = (settings.PRECISION() + zapFee) / settings.PRECISION();
 
         // Get the price of a brewery as if it were valued at the LP tokens rate + a fee for automatically zapping for you
         // Bear in mind this will still be discounted even though we take an extra fee!
@@ -233,6 +233,14 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         // If this is 5% its bad, if this is 20% its good
         uint256 liquidityRatio = usdcReserves * settings.PRECISION() / fullyDilutedValue / 100;
 
+        if (liquidityRatio <= liquidityRatio0) {
+            return lpDiscount1;
+        }
+
+        if (liquidityRatio >= liquidityRatio1) {
+            return lpDiscount0;
+        }
+
         // X is liquidity ratio       (y0 = 5      y1 = 20)
         // Y is discount              (x0 = 15     x1 =  1)
         return (lpDiscount0 * (liquidityRatio1 - liquidityRatio) + lpDiscount1 * (liquidityRatio - liquidityRatio0)) / (liquidityRatio1 - liquidityRatio0);
@@ -241,20 +249,30 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
     /**
      * @notice Calculates how much USDC 1 LP token is worth
      */
+    function getUSDCReserve() public view returns (uint256) {
+        (uint token0Reserve, uint token1Reserve,) = settings.liquidityPair().getReserves();
+        if (settings.liquidityPair().token0() == settings.usdc()) {
+            return token0Reserve;
+        }
+        return token1Reserve;
+    }
+
+    /**
+     * @notice Calculates how much USDC 1 LP token is worth
+     */
     function getUSDCForOneLP() public view returns (uint256) {
-        uint256 meadPrice = getUSDCForOneMead();
         uint256 lpSupply = settings.liquidityPair().totalSupply();
-        (uint meadReserves, uint usdcReserves,) = settings.liquidityPair().getReserves();
-        uint256 meadValue = meadReserves * meadPrice;
-        uint256 usdcValue = usdcReserves;
-        return (meadValue + usdcValue) / lpSupply;
+        uint256 totalReserveInUSDC = getUSDCReserve() * 2;
+        return totalReserveInUSDC * 10 ** settings.liquidityPair().decimals() / lpSupply;
     }
 
     /**
      * @notice Calculates how many LP tokens are worth `_amount` in USDC (for payment)
      */
     function getLPFromUSDC(uint256 _amount) public view returns (uint256) {
-        return _amount * (1 / getUSDCForOneLP());
+        uint256 lpSupply = settings.liquidityPair().totalSupply();
+        uint256 totalReserveInUSDC = getUSDCReserve() * 2;
+        return _amount * lpSupply / totalReserveInUSDC;
     }
 
     /**
@@ -283,7 +301,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
      * @notice Returns how many USDC tokens you need for inputed meadAmount
      */
     function getUSDCForOneMead() public view returns (uint256) {
-        return getUSDCForMead(10 ** ERC20Upgradeable(settings.usdc()).decimals());
+        return getUSDCForMead(10 ** ERC20Upgradeable(settings.mead()).decimals());
     }
 
     /**
@@ -312,11 +330,11 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
     }
 
     function setMinLiquidityRatio(uint256 _ratio) external onlyOwner {
-        liquidityRatio1 = _ratio;
+        liquidityRatio0 = _ratio;
     }
 
     function setMaxLiquidityRatio(uint256 _ratio) external onlyOwner {
-        liquidityRatio0 = _ratio;
+        liquidityRatio1 = _ratio;
     }
 
     function setReputationForMead(uint256 _reputation) external onlyOwner {
