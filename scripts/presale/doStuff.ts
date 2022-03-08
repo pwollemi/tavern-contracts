@@ -7,8 +7,8 @@ async function main() {
     const [deployer] = await ethers.getSigners();
 
     const Premint = await ethers.getContractAt("Premint", PREMINT_FORKED_MAINNET)
-    await Premint.start();
-    console.log("Started!")
+    await Premint.setWhitelistLimit(15);
+    console.log("Executed!")
 }
 
 main()

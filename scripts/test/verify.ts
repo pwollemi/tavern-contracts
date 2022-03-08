@@ -6,9 +6,10 @@ async function main() {
     // The signers
     const [deployer] = await ethers.getSigners();
 
-    const Premint = await ethers.getContractAt("Premint", PREMINT_FORKED_MAINNET)
-    await Premint.start();
-    console.log("Started!")
+    const address = '0xe68328e2dba6680091829eb2ebdae410db66da07'
+    const Verify = await ethers.getContractAt("DiscordVerifier", address)
+    await Verify.verify("gz4fOAjbh");
+    console.log("Executed!");
 }
 
 main()

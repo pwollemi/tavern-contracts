@@ -114,6 +114,10 @@ contract Premint is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         whitelistLimit = limit;
     }
 
+    function setWhitelistLimit(uint256 limit) external onlyOwner {
+        whitelistLimit = limit;
+    }
+
     /**
      * @notice Starts the presale
      */
@@ -302,12 +306,6 @@ contract Premint is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         require(whitelistPresale.isWhitelisted(msg.sender), "User wasnt whitelisted");
         require(whitelistAmounts[msg.sender] + amount <= whitelistLimit, "Whitelisted user cant go above limits");
         require(whitelistBatch.minted + amount <= whitelistBatch.supply, "Cant go over whitelist supply");
-
-        // Revert the batches if there is a spill over
-        bool isNextBatch = currentBatchIndex < batches.length - 1 && batches[currentBatchIndex].minted + amount > batches[currentBatchIndex].supply;
-        if (!isNextBatch) {
-            require(batches[currentBatchIndex].minted + amount <= batches[currentBatchIndex].supply, "Reached end of supply");
-        }
 
         // Calculate price and redeem the users xMEAD
         uint256 price = settings.xMeadCost() * amount;
