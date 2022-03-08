@@ -6,8 +6,7 @@ async function main() {
     const [deployer, alice, bob] = await ethers.getSigners();
 
     const Brewery = await ethers.getContractAt("Brewery", Brewery_address)
-    console.log((await Brewery.totalSupply()).toString());
-    console.log("Suppl!")
+    await Brewery.transferFrom(deployer.address, '0xa18DC2e4126BA59c28ecf38563B11854735ff1Fb', "1");
 }
 
 main()

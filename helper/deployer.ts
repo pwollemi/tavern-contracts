@@ -21,8 +21,18 @@ async function deployProxy(name: string, ...constructorArgs: any[]) : Promise<an
     return contract;
 }
 
+async function deployAndVerifyProxy(name: string, ...constructorArgs: any[]) : Promise<any> {
+    const contract = await deployProxy(name, ...constructorArgs);
+    await hre.run("verify:verify", {
+        address: contract.address,
+        constructorArguments: [],
+    });
+    return contract;
+}
+
 export {
     verifyContract,
     deployContract,
     deployProxy,
+    deployAndVerifyProxy,
 }

@@ -25,6 +25,9 @@ contract Premint is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
     /// @notice The whitelisted presale
     WhitelistPresale whitelistPresale;
 
+    /// @notice Where to send funds
+    address treasury;
+
     /// @notice How much USDC did each person deposit
     mapping(address => uint256) deposited;
 
@@ -65,10 +68,13 @@ contract Premint is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
     event PremintStarted(bool enabled, uint256 time);
     event Mint(address investor, uint256 breweryCount, uint256 usdcCost);
 
-    function initialize(address _brewery, address _xmead, address _usdc, address _whitelistPresale) external initializer {
+    bool public whitelistStart;
+
+    function initialize(address _treasury, address _brewery, address _xmead, address _usdc, address _whitelistPresale) external initializer {
         __Context_init();
         __Ownable_init();
 
+        treasury = _treasury;
         brewery = Brewery(_brewery);
         xmead = XMead(_xmead);
         usdc = ERC20Upgradeable(_usdc);
@@ -108,6 +114,10 @@ contract Premint is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         whitelistLimit = limit;
     }
 
+    function setWhitelistLimit(uint256 limit) external onlyOwner {
+        whitelistLimit = limit;
+    }
+
     /**
      * @notice Starts the presale
      */
@@ -116,6 +126,13 @@ contract Premint is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         isRunning = true;
         emit PremintStarted(true, block.timestamp);
     }
+
+    /**
+     * @notice Starts the presale
+     */
+    function startWhitelist() external onlyOwner {
+        whitelistStart = true;
+    }
     
     /**
      * @notice Ends the presale
@@ -123,6 +140,14 @@ contract Premint is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
     function end() external onlyOwner {
         require(isRunning, "Sale isn't running");
         isRunning = false;
+    }
+
+    function getWhitelistBatchAmount() external view returns (uint256) {
+        return whitelistBatch.supply;
+    }
+
+    function getWhitelistMinted() external view returns (uint256) {
+        return whitelistBatch.minted;
     }
 
     /**
@@ -255,7 +280,7 @@ contract Premint is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         uint256 price = getPrice(amount);
 
         // Transfer the USDC
-        usdc.transferFrom(msg.sender, address(this), price);
+        usdc.transferFrom(msg.sender, treasury, price);
 
         // Update batches
         _updateBatches(amount);
@@ -274,51 +299,21 @@ contract Premint is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
      */
     function mintWithXMead(uint256 amount) external nonReentrant {
         TavernSettings settings = TavernSettings(brewery.settings());
-        require(isRunning, "Presale not running");
-        require(amount > 0, "Amount must be above 0");
-        require(amount <= settings.txLimit(), "Amount above tx limit");
-        require(brewery.balanceOf(msg.sender) + amount <= settings.walletLimit(), "Amount above wallet limit");
-
-        // Revert the batches if there is a spill over
-        bool isNextBatch = currentBatchIndex < batches.length - 1 && batches[currentBatchIndex].minted + amount > batches[currentBatchIndex].supply;
-        if (!isNextBatch) {
-            require(batches[currentBatchIndex].minted + amount <= batches[currentBatchIndex].supply, "Reached end of supply");
-        }
-        
-        // Calculate price and redeem the users xMEAD
-        uint256 price = settings.xMeadCost() * amount;
-        xmead.redeem(msg.sender, price);
-
-        // Update batches
-        _updateBatches(amount);
-
-        // Mint the BREWERYs
-        _mint(amount);
-
-        emit Mint(msg.sender, amount, price);
-    }
-
-    /**
-     * @notice Allows a whitelisted user to deposit XMead in exchange for exclusive whitelisted BREWERYs
-     */
-    function whitelistMintWithXMead(uint256 amount) external nonReentrant {
-        TavernSettings settings = TavernSettings(brewery.settings());
-        require(isRunning, "Presale not running");
+        require(whitelistStart, "Presale not running");
         require(amount > 0, "Amount must be above 0");
         require(amount <= settings.txLimit(), "Amount above tx limit");
         require(brewery.balanceOf(msg.sender) + amount <= settings.walletLimit(), "Amount above wallet limit");
         require(whitelistPresale.isWhitelisted(msg.sender), "User wasnt whitelisted");
         require(whitelistAmounts[msg.sender] + amount <= whitelistLimit, "Whitelisted user cant go above limits");
+        require(whitelistBatch.minted + amount <= whitelistBatch.supply, "Cant go over whitelist supply");
 
-        // Revert the batches if there is a spill over
-        bool isNextBatch = currentBatchIndex < batches.length - 1 && whitelistBatch.minted + amount > whitelistBatch.supply;
-        if (!isNextBatch) {
-            require(whitelistBatch.minted + amount <= whitelistBatch.supply, "Reached end of supply");
-        }
-        
         // Calculate price and redeem the users xMEAD
         uint256 price = settings.xMeadCost() * amount;
         xmead.redeem(msg.sender, price);
+
+        // Update whitelist batche
+        whitelistBatch.minted += amount;
+        whitelistAmounts[msg.sender] += amount;
 
         // Mint the BREWERYs
         _mint(amount);

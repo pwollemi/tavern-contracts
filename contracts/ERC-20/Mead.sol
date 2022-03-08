@@ -69,7 +69,7 @@ contract Mead is Initializable, IERC20Upgradeable, OwnableUpgradeable {
         liquidityPair = IJoeFactory(dexRouter.factory()).createPair(address(this), _usdcAddress);
 
         // Mint the initial supply to the deployer
-        _mint(msg.sender, _initialSupply * 10**DECIMALS);
+        _mint(msg.sender, _initialSupply);
     }
 
     /**
@@ -129,14 +129,14 @@ contract Mead is Initializable, IERC20Upgradeable, OwnableUpgradeable {
      * @notice Mints token to the treasury address
      */
     function mint(uint256 _amount) public onlyOwner {
-        _mint(msg.sender, _amount * 10**DECIMALS);
+        _mint(msg.sender, _amount);
     }
 
     /**
      * @notice Burns tokens from the treasury address
      */
     function burn(uint256 _amount) public onlyOwner {
-        _burn(msg.sender, _amount * 10**DECIMALS);
+        _burn(msg.sender, _amount);
     }
 
     /**

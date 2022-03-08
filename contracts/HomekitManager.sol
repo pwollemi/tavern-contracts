@@ -34,9 +34,12 @@ contract HonmekitManager is Initializable, AccessControlUpgradeable {
     }
 
     /// @notice A mapping of how many homekits each person has
-    mapping (address => uint256) public owned;
+    mapping (address => HomekitStats) public homekits;
 
-    /// @notice The base production rate in seconds
+    /// @notice The homekit price in USDC
+    uint256 public homekitPrice;
+
+    /// @notice The base production rate in USDC per second
     uint256 public productionRatePerSecond;
 
     /// @notice Emitted events
@@ -65,5 +68,46 @@ contract HonmekitManager is Initializable, AccessControlUpgradeable {
         settings = TavernSettings(_tavernSettings);
     }
 
+    /**
+     * @notice Returns how many MEAD tokens you get for 1 USDC
+     */
+    function getMeadforUSDC() public view returns (uint256) {
+        address[] memory path = new address[](2);
+        path[0] = settings.mead();
+        path[1] = settings.usdc();
+        uint256[] memory amountsOut = settings.dexRouter().getAmountsIn(10 ** ERC20Upgradeable(settings.usdc()).decimals(), path);
+        return amountsOut[0];
+    }
 
+    /**
+     * @notice Helper to calculate the reward period with respect to a start time
+     */
+    function getRewardPeriod(uint256 lastClaimed) public view returns (uint256) {
+        // If we haven't passed the last time since we claimed (also the create time) then return zero as we haven't started yet
+        // If we we passed the last time since we claimed (or the create time), but we haven't passed it 
+        if (block.timestamp < startTime) {
+            return 0;
+        } else if (lastClaimed < startTime) {
+            return block.timestamp - startTime;
+        } else {
+            return block.timestamp - lastClaimed;
+        }
+    }
+
+    /**
+     * @notice Returns the unclaimed MEAD rewards for a given BREWERY 
+     */
+    function pendingMead() public view returns (uint256) {
+        // rewardPeriod is 0 when currentTime is less than start time
+        uint256 rewardPeriod = getRewardPeriod(homekits[msg.sender].lastTimeClaimed);
+        return rewardPeriod * productionRatePerSecond * getMeadforUSDC();
+    }
+
+    /**
+     * @notice Claims the rewards from a specific node
+     */
+    function claim(address account) public {
+        require(homekits[msg.sender].count > 0, "Must own homekits");
+
+    }
 }
