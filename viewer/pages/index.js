@@ -6,7 +6,7 @@ import { ethers } from "ethers"
 import { FetchWrapper, NftProvider, useNft } from "use-nft"
 import { useEffect, useState } from 'react'
 
-const RPC_URL = "http://127.0.0.1:8545"
+const RPC_URL = "https://speedy-nodes-nyc.moralis.io/50561c02c5a853febf23eb96/avalanche/mainnet"; //http://127.0.0.1:8545"
 
 // We are using the "ethers" fetcher here.
 const ethersConfig = {
@@ -36,8 +36,8 @@ function Nft() {
   useEffect(() => {
     const interval = setInterval(() => {
       fetchWrapper.fetchNft(
-        '0xFD471836031dc5108809D173A067e8486B9047A3',
-        "21"
+        '0xf5E723f0FD54f8c75f0Da8A8F9D68Bf67B20b850',
+        "1"
       ).then(r => {
         setNft(r);
         console.log("REsult", r);
