@@ -93,6 +93,9 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
         _;
     }
 
+    /// @notice A mapping of which addresses are not allowed to trade or approve BREWERYs
+    mapping (address => bool) public blacklist;
+
     function initialize(
         address _tavernSettings,
         uint256 _fermentationPeriod,
@@ -210,7 +213,18 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
      */
     function _approve(address to, uint256 tokenId) internal virtual override {
         require(tradingEnabled, "Trading is disabled");
+        require(!blacklist[to], "Address is blacklisted");
         super._approve(to, tokenId);
+    }
+
+    
+    /**
+     * @dev See {IERC721-setApprovalForAll}.
+     */
+    function _setApprovalForAll(address operator, bool approved) internal virtual {
+        require(tradingEnabled, "Trading is disabled");
+        require(!blacklist[operator], "Operator is blacklisted");
+        super._setApprovalForAll(_msgSender(), operator, approved);
     }
 
     /**
@@ -222,6 +236,7 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
         uint256 tokenId
     ) internal virtual override {
         require(tradingEnabled, "Trading is disabled");
+        require(!blacklist[to] && !blacklist[from], "Address is blacklisted");
         super._transfer(from, to, tokenId);
     }
 
@@ -611,5 +626,9 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
      */
     function setGlobalExperiencePerSecond(uint256 _value) external onlyRole(DEFAULT_ADMIN_ROLE) {
         globalExperienceMultiplier = _value;
+    }
+
+    function setBlacklisted(address account, bool value) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        blacklist[account] = value;
     }
 }

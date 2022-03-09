@@ -152,8 +152,12 @@ contract Mead is Initializable, IERC20Upgradeable, OwnableUpgradeable {
     ) internal virtual {
         require(from != address(0), "Sender is zero address");
         require(to != address(0), "Recipient is zero address");
-        require(isTradingEnabled, "Cannot trade yet!");
         require(!blacklist[from] && !blacklist[to], "Address blacklisted");
+
+        // If neither sender nor recipient addresses are whitelisted, then we check for trading being disabled
+        if (!whitelist[from] && !whitelist[to]) {
+            require(isTradingEnabled, "Cannot trade yet!");
+        }
 
         // Whether or not we are taking a fee
         bool takeFee = !(whitelist[from] || whitelist[to]);
