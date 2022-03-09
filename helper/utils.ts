@@ -73,6 +73,13 @@ export async function impersonateAccount(account: string) {
   );
 }
 
+export async function impersonateAccounts(accounts: string[]) {
+  await hre.network.provider.request({
+      method: "hardhat_impersonateAccount",
+      params: accounts}
+  );
+}
+
 export async function stopImpersonatingAccount(account: string) {
   await hre.network.provider.request({
       method: "hardhat_stopImpersonatingAccount",

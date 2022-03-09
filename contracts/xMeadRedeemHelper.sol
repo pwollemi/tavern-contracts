@@ -26,7 +26,7 @@ contract xMeadRedeemHelper is Initializable, AccessControlUpgradeable {
     uint256 public interval;
 
     /// @notice The limtis imposed on each account
-    mapping (address => uint256) redeems;
+    mapping (address => uint256) public redeems;
 
     /// @notice How much tokens per day
     uint256 public tranche; 
@@ -43,7 +43,7 @@ contract xMeadRedeemHelper is Initializable, AccessControlUpgradeable {
         _;
     }
 
-    function initialize(address _tavernSettings, address _whitelist, uint256 _tranch, uint256 _interval) external initializer {
+    function initialize(address _tavernSettings, address _whitelist, uint256 _tranche, uint256 _interval) external initializer {
         __Context_init();
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -51,7 +51,7 @@ contract xMeadRedeemHelper is Initializable, AccessControlUpgradeable {
         settings = TavernSettings(_tavernSettings);
         whitelist = WhitelistPresale(_whitelist);
 
-        tranche = _tranch;
+        tranche = _tranche;
         interval = _interval;
     }
 
@@ -82,9 +82,9 @@ contract xMeadRedeemHelper is Initializable, AccessControlUpgradeable {
 
             XMead(settings.xmead()).redeem(msg.sender, amount);
             IERC20Upgradeable(settings.mead()).transferFrom(settings.rewardsPool(), msg.sender, amount);
-
-            redeems[msg.sender] += amount;
         }
+
+        redeems[msg.sender] += amount;
     }
 
     /**

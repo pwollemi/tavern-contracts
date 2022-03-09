@@ -11,10 +11,7 @@ async function main() {
     const [deployer, addr1, addr2, addr3, addr4] = await ethers.getSigners();
 
     const MeadContract = await ethers.getContractAt("Mead", Mead_address);
-    console.log("owneer", await MeadContract.owner());
-
-    console.log('d', deployer.address);
-    console.log('a', addr1.address);
+    console.log("owner", await MeadContract.owner());
     
     const mead = await ethers.getContractFactory("Mead");
     await upgrades.upgradeProxy(Mead_address, mead);

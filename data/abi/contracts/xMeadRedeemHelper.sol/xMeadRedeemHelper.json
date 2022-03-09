@@ -120,29 +120,42 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "bool",
+        "name": "_enabled",
+        "type": "bool"
+      }
+    ],
+    "name": "enable",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
-    "name": "MEAD",
+    "name": "enabled",
     "outputs": [
       {
-        "internalType": "address",
+        "internalType": "bool",
         "name": "",
-        "type": "address"
+        "type": "bool"
       }
     ],
     "stateMutability": "view",
     "type": "function"
   },
   {
-    "inputs": [
+    "inputs": [],
+    "name": "getInterval",
+    "outputs": [
       {
-        "internalType": "bool",
-        "name": "_redeemEnabled",
-        "type": "bool"
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
-    "name": "enableRedeem",
-    "outputs": [],
-    "stateMutability": "nonpayable",
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -210,18 +223,23 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "_xMEAD",
+        "name": "_tavernSettings",
         "type": "address"
       },
       {
         "internalType": "address",
-        "name": "_MEAD",
+        "name": "_whitelist",
         "type": "address"
       },
       {
-        "internalType": "address",
-        "name": "_pool",
-        "type": "address"
+        "internalType": "uint256",
+        "name": "_tranche",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_interval",
+        "type": "uint256"
       }
     ],
     "name": "initialize",
@@ -231,12 +249,12 @@
   },
   {
     "inputs": [],
-    "name": "pool",
+    "name": "interval",
     "outputs": [
       {
-        "internalType": "address",
+        "internalType": "uint256",
         "name": "",
-        "type": "address"
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -256,13 +274,19 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "redeemEnabled",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "redeems",
     "outputs": [
       {
-        "internalType": "bool",
+        "internalType": "uint256",
         "name": "",
-        "type": "bool"
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -305,16 +329,29 @@
     "type": "function"
   },
   {
-    "inputs": [
+    "inputs": [],
+    "name": "settings",
+    "outputs": [
       {
-        "internalType": "address",
-        "name": "_pool",
+        "internalType": "contract TavernSettings",
+        "name": "",
         "type": "address"
       }
     ],
-    "name": "setPool",
-    "outputs": [],
-    "stateMutability": "nonpayable",
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "startTime",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -338,7 +375,7 @@
   },
   {
     "inputs": [],
-    "name": "unlockTimer",
+    "name": "tranche",
     "outputs": [
       {
         "internalType": "uint256",
@@ -351,10 +388,10 @@
   },
   {
     "inputs": [],
-    "name": "xMEAD",
+    "name": "whitelist",
     "outputs": [
       {
-        "internalType": "address",
+        "internalType": "contract WhitelistPresale",
         "name": "",
         "type": "address"
       }
