@@ -9,10 +9,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./TavernSettings.sol";
 import "./ERC-721/Brewery.sol";
 import "./ClassManager.sol";
-
-interface IxMEAD { 
-    function redeem(address, uint256) external;
-}
+import "./ERC-20/xMead.sol";
 
 /**
  * @notice There are some conditions to make this work
@@ -96,12 +93,12 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
     function purchaseWithXMead(string memory name) external {
 
         uint256 xMeadAmount = settings.xMeadCost();
-        IxMEAD(settings.xmead()).redeem(msg.sender, xMeadAmount);
+        XMead(settings.xmead()).redeem(msg.sender, xMeadAmount);
         IERC20Upgradeable(settings.mead()).safeTransferFrom(settings.redeemPool(), settings.tavernsKeep(), xMeadAmount * settings.treasuryFee() / settings.PRECISION());
         IERC20Upgradeable(settings.mead()).safeTransferFrom(settings.redeemPool(), settings.rewardsPool(), xMeadAmount * settings.rewardPoolFee() / settings.PRECISION());
 
         // Mint logic
-        _mint(msg.sender, name, reputationForMead);
+        _mint(msg.sender, name, settings.reputationForMead());
     }
     
     /**
@@ -113,7 +110,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         IERC20Upgradeable(settings.mead()).safeTransferFrom(msg.sender, settings.rewardsPool(), meadAmount * settings.rewardPoolFee() / settings.PRECISION());
 
         // Mint logic
-        _mint(msg.sender, name, reputationForMead);
+        _mint(msg.sender, name, settings.reputationForMead());
     }
 
     /**
@@ -127,7 +124,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         IERC20Upgradeable(settings.usdc()).safeTransferFrom(msg.sender, settings.tavernsKeep(), usdcAmount);
 
         // Mint logic
-        _mint(msg.sender, name, reputationForMead);
+        _mint(msg.sender, name, settings.reputationForUSDC());
     }
     
     /**
@@ -144,7 +141,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         settings.liquidityPair().transferFrom(msg.sender, settings.tavernsKeep(), breweryPriceInLP * (settings.PRECISION() - discount) / settings.PRECISION());
 
         // Mint logic
-        _mint(msg.sender, name, reputationForMead);
+        _mint(msg.sender, name, settings.reputationForLP());
     }
 
     /**
@@ -167,7 +164,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         settings.liquidityPair().transferFrom(msg.sender, settings.tavernsKeep(), liquidityTokens);
 
         // Mint logic
-        _mint(msg.sender, name, reputationForMead);
+        _mint(msg.sender, name, settings.reputationForLP());
     }
 
     /**
@@ -326,18 +323,6 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
 
     function setMaxLiquidityRatio(uint256 _ratio) external onlyOwner {
         liquidityRatio1 = _ratio;
-    }
-
-    function setReputationForMead(uint256 _reputation) external onlyOwner {
-        reputationForMead = _reputation;
-    }
-
-    function setReputationForUSDC(uint256 _reputation) external onlyOwner {
-        reputationForUSDC = _reputation;
-    }
-
-    function setReputationForLP(uint256 _reputation) external onlyOwner {
-        reputationForLP = _reputation;
     }
 
     function setZapSlippage(uint256 _zap) external onlyOwner {
