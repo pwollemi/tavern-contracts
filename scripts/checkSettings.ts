@@ -1,9 +1,10 @@
 import { ethers } from "hardhat";
+import { settings_address } from "./NFT_ADDRESSES";
 
 async function main() {
     // The signers
     const [deployer] = await ethers.getSigners();
-    const settings = await ethers.getContractAt("TavernSettings", "0x8f90f0eB59950692eA6A87bEA260908eD3a4a38F");
+    const settings = await ethers.getContractAt("TavernSettings", settings_address);
     console.log("=== Addresses ===")
     console.log("\tMead", await settings.mead());
     console.log("\txMead", await settings.xmead());
@@ -23,7 +24,6 @@ async function main() {
     console.log("\twalletLimit", await settings.walletLimit());
     console.log("\tbreweryCost", await settings.breweryCost());
     console.log("\txMeadCost", await settings.xMeadCost());
-    console.log("\twalletLimit", await settings.walletLimit());
 }
 
 main()

@@ -52,12 +52,22 @@ const config: HardhatUserConfig = {
     hardhat: {
       chainId: 1337,
       forking: {
-        url: process.env.AVAX_MAINNET
+        url: process.env.AVAX_MAINNET,
       },
+      accounts: [
+        {
+          privateKey: process.env.PRIVATE_KEY2,
+          balance: '1000000000000000000000000'
+        }, 
+        {
+          privateKey: process.env.PRIVATE_KEY,
+          balance: '1000000000000000000000000'
+        }
+      ],
     },
     avaxmainnet: {
       url: process.env.AVAX_MAINNET,
-      gasPrice: 300000000000,
+      gasPrice: 100000000000,
       accounts:
         process.env.PRIVATE_KEY2 !== undefined ? [process.env.PRIVATE_KEY2, process.env.PRIVATE_KEY] : [],
     },

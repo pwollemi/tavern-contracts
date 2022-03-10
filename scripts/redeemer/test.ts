@@ -21,7 +21,7 @@ async function main() {
 
     // address _tavernSettings, address _whitelist, uint256 _tranch, uint256 _interval
     const tranche = "1000";   // 10%
-    const interval = 10; // 1 day in seconds
+    const interval = 86400; // 1 day in seconds
     
     const xMead = await ethers.getContractAt("XMead", xMead_address);
     const Mead = await ethers.getContractAt("Mead", Mead_address);
