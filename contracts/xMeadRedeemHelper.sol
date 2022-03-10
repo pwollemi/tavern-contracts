@@ -2,6 +2,7 @@ pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 import "./TavernSettings.sol";
@@ -9,6 +10,7 @@ import "./Presales/WhitelistPresale.sol";
 import "./ERC-20/xMead.sol";
 
 contract xMeadRedeemHelper is Initializable, AccessControlUpgradeable {
+    using SafeERC20Upgradeable for IERC20Upgradeable;
 
     /// @notice The settings contract
     TavernSettings public settings;
@@ -60,7 +62,9 @@ contract xMeadRedeemHelper is Initializable, AccessControlUpgradeable {
      */
     function enable(bool _enabled) external isRole(DEFAULT_ADMIN_ROLE) {
         enabled = _enabled;
-        startTime = block.timestamp;
+        if (enabled && startTime == 0) {
+            startTime = block.timestamp;
+        }
     }
 
     /**
@@ -74,17 +78,24 @@ contract xMeadRedeemHelper is Initializable, AccessControlUpgradeable {
         // Otherwise we need to check if the limits have been used
         if (hasRole(BYPASS_ROLE, msg.sender)) {
             XMead(settings.xmead()).redeem(msg.sender, amount);
-            IERC20Upgradeable(settings.mead()).transferFrom(settings.rewardsPool(), msg.sender, amount);
+            IERC20Upgradeable(settings.mead()).safeTransferFrom(settings.rewardsPool(), msg.sender, amount);
         } else {
-            uint256 totalIssued = whitelist.deposited(msg.sender) * whitelist.tokenRate() / (10**whitelist.usdc().decimals());
-            uint256 unlocked = totalIssued * tranche * (getInterval() + 1) / 1e4;
+            uint256 unlocked = unlockedAmount(msg.sender);
             require(redeems[msg.sender] + amount <= unlocked, "You cant redeem more than your allowance");
 
             XMead(settings.xmead()).redeem(msg.sender, amount);
-            IERC20Upgradeable(settings.mead()).transferFrom(settings.rewardsPool(), msg.sender, amount);
+            IERC20Upgradeable(settings.mead()).safeTransferFrom(settings.rewardsPool(), msg.sender, amount);
         }
 
         redeems[msg.sender] += amount;
+    }
+
+    /**
+     * @notice Returns the redeemable amount of ther user
+     */
+    function unlockedAmount(address user) public view returns (uint256 unlocked) {
+        uint256 totalIssued = whitelist.deposited(user) * whitelist.tokenRate() / (10**whitelist.usdc().decimals());
+        unlocked = totalIssued * tranche * (getInterval() + 1) / 1e4;
     }
 
     /**
