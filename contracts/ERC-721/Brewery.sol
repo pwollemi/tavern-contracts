@@ -11,6 +11,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 import "./Renovation.sol";
+import "../ClassManager.sol";
 import "../TavernSettings.sol";
 import "../interfaces/IClassManager.sol";
 
@@ -181,7 +182,7 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
             if (takenMead >= totalCost) {
                 break;
             }
-            
+
             // The token Id
             uint256 tokenId = tokenOfOwnerByIndex(msg.sender, i);
 
@@ -201,6 +202,7 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
         // For each, mint a new BREWERY
         for (uint256 i = 0; i < _amount; ++i) {
             mint(msg.sender, "");
+            ClassManager(settings.classManager()).addReputation(msg.sender, settings.reputationForMead());
         }
 
         // Send the treasury cut
@@ -209,7 +211,6 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
         
         // Claim any leftover tokens over to the user
         _claim(takenMead - totalCost);
-
     }
 
     /**
@@ -436,7 +437,6 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
         IERC20Upgradeable mead = IERC20Upgradeable(settings.mead());
         mead.safeTransferFrom(settings.rewardsPool(), msg.sender, rewardAmount);
         mead.safeTransferFrom(settings.rewardsPool(), settings.tavernsKeep(), treasuryAmount);
-    
     }
 
     /**
