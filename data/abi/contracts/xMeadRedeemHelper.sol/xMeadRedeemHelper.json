@@ -387,6 +387,25 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      }
+    ],
+    "name": "unlockedAmount",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "unlocked",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "whitelist",
     "outputs": [

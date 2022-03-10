@@ -9,8 +9,8 @@ async function main() {
     const xMead = await ethers.getContractAt("XMead", XMEAD_MAINNET);
 
     // Let the presale contract issue xMEAD
-    await xMead.connect(deployer).grantRole(await xMead.ISSUER_ROLE(), presale.address);
-    console.log(`Presale contract (${presale.address}) is enabled to issue xMead!`);
+    await xMead.connect(addr1).grantRole(await xMead.DEFAULT_ADMIN_ROLE(), deployer.address);
+    console.log(`Address (${deployer.address}) is now an admin for xMead!`);
 }
 
 main()
