@@ -168,19 +168,48 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
      * @notice Compounds MEAD
      */
     function _compound(uint256 _amount) internal {
-        uint256 totalRewards = getTotalPendingMead(msg.sender);
-        uint256 cost = _amount * settings.breweryCost();
-        require(totalRewards >= cost, "You dont have enough pending MEAD");
+        uint256 totalCost = _amount * settings.breweryCost();
 
-        uint256 count = balanceOf(msg.sender);
-        for(uint256 i = 0; i < count; ++i) {
-            uint256 tokenId = tokenOfOwnerByIndex(msg.sender, i);
-            if (totalRewards >= settings.breweryCost()) {
-                totalRewards -= pendingMead(tokenId);
-                breweryStats[tokenId].lastTimeClaimed = block.timestamp;
-                mint(msg.sender, "");
+        // Keep track of the MEAD that we've internally claimed
+        uint256 takenMead = 0;
+
+        // For each BREWERY that msg.sender owns, drain their pending MEAD amounts 
+        // until we have enough MEAD to cover the totalCost 
+        uint256 balance = balanceOf(msg.sender);
+        for(uint256 i = 0; i < balance; ++i) {
+            // Break when we've taken enough MEAD
+            if (takenMead >= totalCost) {
+                break;
             }
+            
+            // The token Id
+            uint256 tokenId = tokenOfOwnerByIndex(msg.sender, i);
+
+            // Get the pending MEAD
+            uint256 tokenPendingMead = pendingMead(tokenId);
+
+            // Give this BREWERY the relevant XP and claim out its pending MEAD
+            _calculateXp(tokenId);
+            breweryStats[tokenId].lastTimeClaimed = block.timestamp;
+
+            takenMead += tokenPendingMead;
         }
+
+        // If the taken mead isn't above the total cost for this transaction, then entirely revert
+        require(takenMead >= totalCost, "You dont have enough pending MEAD");
+
+        // For each, mint a new BREWERY
+        for (uint256 i = 0; i < _amount; ++i) {
+            mint(msg.sender, "");
+        }
+
+        // Send the treasury cut
+        IERC20Upgradeable mead = IERC20Upgradeable(settings.mead());
+        mead.safeTransferFrom(settings.rewardsPool(), settings.tavernsKeep(), totalCost * settings.treasuryFee() / 1e4);
+        
+        // Claim any leftover tokens over to the user
+        _claim(takenMead - totalCost);
+
     }
 
     /**
@@ -380,28 +409,9 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
     }
 
     /**
-     * @notice Claims the rewards from a specific node
+     * @notice Adds any pending XP to a given BREWERY, and compute whether a tier rank up occured
      */
-    function claim(uint256 _tokenId) public {
-        require(ownerOf(_tokenId) == _msgSender(), "Must be owner of this BREWERY");
-        require(getApproved(_tokenId) == address(0), "BREWERY is approved for spending/listed");
-
-        // Award MEAD tokens
-        uint256 totalRewards = pendingMead(_tokenId);
-        if (totalRewards > 0) {
-            uint256 claimTax = getBrewersTax(msg.sender);
-            uint256 treasuryAmount = totalRewards * claimTax / 1e4;
-            uint256 rewardAmount = totalRewards - treasuryAmount;
-
-            // Transfer the resulting mead from the rewards pool to the user
-            // Transfer the taxed portion of mead from the rewards pool to the treasury
-            IERC20Upgradeable mead = IERC20Upgradeable(settings.mead());
-            mead.safeTransferFrom(settings.rewardsPool(), msg.sender, rewardAmount);
-            mead.safeTransferFrom(settings.rewardsPool(), settings.tavernsKeep(), treasuryAmount);
-        
-            breweryStats[_tokenId].totalYield += totalRewards;
-        }
-
+    function _calculateXp(uint256 _tokenId) internal {
         // Award XP
         breweryStats[_tokenId].xp += getPendingXp(_tokenId);
 
@@ -411,6 +421,42 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
             breweryStats[_tokenId].tier = tier;
             emit LevelUp(msg.sender, _tokenId, tier, breweryStats[_tokenId].xp, block.timestamp);
         }
+    }
+
+    /**
+     * @notice Handles the specific claiming of MEAD and distributing it to the rewards pool and the treasury
+     */
+    function _claim(uint256 amount) internal {
+        uint256 claimTax = getBrewersTax(msg.sender);
+        uint256 treasuryAmount = amount * claimTax / 1e4;
+        uint256 rewardAmount = amount - treasuryAmount;
+
+        // Transfer the resulting mead from the rewards pool to the user
+        // Transfer the taxed portion of mead from the rewards pool to the treasury
+        IERC20Upgradeable mead = IERC20Upgradeable(settings.mead());
+        mead.safeTransferFrom(settings.rewardsPool(), msg.sender, rewardAmount);
+        mead.safeTransferFrom(settings.rewardsPool(), settings.tavernsKeep(), treasuryAmount);
+    
+    }
+
+    /**
+     * @notice Claims the rewards from a specific node
+     */
+    function claim(uint256 _tokenId) public {
+        require(ownerOf(_tokenId) == _msgSender(), "Must be owner of this BREWERY");
+        require(getApproved(_tokenId) == address(0), "BREWERY is approved for spending/listed");
+
+        // Award MEAD tokens
+        uint256 totalRewards = pendingMead(_tokenId);
+        if (totalRewards > 0) {
+            // Handles the token transfer
+            _claim(totalRewards);
+            
+            // Increase the yield of this tokenID
+            breweryStats[_tokenId].totalYield += totalRewards;
+        }
+
+        _calculateXp(_tokenId);
 
         // Reset the claim timer so that individuals have to wait past the fermentation period again
         breweryStats[_tokenId].lastTimeClaimed = block.timestamp;
