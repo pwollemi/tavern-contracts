@@ -9,6 +9,13 @@ import "./TavernSettings.sol";
 import "./Presales/WhitelistPresale.sol";
 import "./ERC-20/xMead.sol";
 
+/**
+ * @notice Handles the vesting of XMEAD redeems
+ *
+ * To work this class needs the following
+ *     - xMEAD Redeemer role
+ *     - Approval from the rewards pool
+ */
 contract xMeadRedeemHelper is Initializable, AccessControlUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
