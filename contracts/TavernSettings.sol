@@ -69,6 +69,15 @@ contract TavernSettings is Initializable, OwnableUpgradeable {
     /// @dev classTaxes.length === ClassManager::classThresholds.length 
     uint256[] public classTaxes;
 
+    /// @notice The amount of reputation gained for buying a BREWERY with MEAD
+    uint256 public reputationForMead;
+
+    /// @notice The amount of reputation gained for buying a BREWERY with USDC
+    uint256 public reputationForUSDC;
+
+    /// @notice The amount of reputation gained for buying a BREWERY with LP tokens
+    uint256 public reputationForLP;
+
     function initialize(
         address _xmead, 
         address _mead, 
@@ -82,7 +91,6 @@ contract TavernSettings is Initializable, OwnableUpgradeable {
         uint256 classCount = IClassManager(_classManager).getClassCount();
         require(classCount > 0, "Class manager not configured!");
         require(_classTaxes.length == classCount, "Class tax array length isnt right");
-        
 
         // Set up the tavern contracts
         xmead = _xmead;
@@ -176,5 +184,17 @@ contract TavernSettings is Initializable, OwnableUpgradeable {
 
     function addClassTax(uint256 _tax) external onlyOwner {
         classTaxes.push(_tax);
+    }
+
+    function setReputationForMead(uint256 _amount) external onlyOwner {
+        reputationForMead = _amount;
+    }
+
+    function setReputationForUSDC(uint256 _amount) external onlyOwner {
+        reputationForUSDC = _amount;
+    }
+
+    function setReputationForLP(uint256 _amount) external onlyOwner {
+        reputationForLP = _amount;
     }
 }

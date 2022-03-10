@@ -51,15 +51,6 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
     /// @notice The discount (to be applied when the liquidity ratio is equal to or less than `liquidityRatio1`)
     uint256 public lpDiscount1;
 
-    /// @notice The amount of reputation gained for buying a BREWERY with MEAD
-    uint256 public reputationForMead;
-
-    /// @notice The amount of reputation gained for buying a BREWERY with USDC
-    uint256 public reputationForUSDC;
-
-    /// @notice The amount of reputation gained for buying a BREWERY with LP tokens
-    uint256 public reputationForLP;
-
     /// @notice Liquidity zapping slippage
     uint256 public zapSlippage;
 
