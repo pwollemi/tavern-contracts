@@ -31,7 +31,7 @@ describe('Public Presale', () => {
   let usdc: IERC20;
 
   const raiseAim = ethers.utils.parseUnits("100000", 6);
-  const tokenRate = 100; // 100 xMEAD per 1 USDC
+  const tokenRate = ethers.utils.parseUnits("100", 18); // 100 xMEAD per 1 USDC
   const min = ethers.utils.parseUnits("100", 6)
   const timeInterval = 900; // 15 mins
 
@@ -133,7 +133,7 @@ describe('Public Presale', () => {
       await whitelistPresale.start();
       const startTime = await getLatestBlockTimestamp();
       const investAmount = ethers.utils.parseUnits("10000", USDC.decimals);
-      const xmeadAmount = investAmount.mul(tokenRate).mul(1e12);
+      const xmeadAmount = investAmount.mul(tokenRate);
       await setNextBlockTimestamp(startTime + 864000);
 
       const usdc0 = await usdc.balanceOf(alice.address);
