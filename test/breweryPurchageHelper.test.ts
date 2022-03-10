@@ -118,61 +118,61 @@ describe('Brewery Purchase Helper', () => {
     await brewery.addTier(tiers[2], yields[2]);
   });
 
-  // it("Purchase with XMead", async () => {
-  //   const xMeadCost = await settings.xMeadCost();
-  //   await xmead.issue(alice.address, xMeadCost);
+  it("Purchase with XMead", async () => {
+    const xMeadCost = await settings.xMeadCost();
+    await xmead.issue(alice.address, xMeadCost);
 
-  //   await purchaser.connect(alice).purchaseWithXMead("test");
-  //   expect(await brewery.balanceOf(alice.address)).to.be.equal(1);
-  //   expect(await xmead.balanceOf(alice.address)).to.be.equal(0);
-  // });
+    await purchaser.connect(alice).purchaseWithXMead("test");
+    expect(await brewery.balanceOf(alice.address)).to.be.equal(1);
+    expect(await xmead.balanceOf(alice.address)).to.be.equal(0);
+  });
 
-  // it("Purchase with mead", async () => {
-  //   const meadCost = await settings.breweryCost();
-  //   await mead.transfer(alice.address, meadCost);
-  //   await mead.connect(alice).approve(purchaser.address, ethers.constants.MaxUint256);
+  it("Purchase with mead", async () => {
+    const meadCost = await settings.breweryCost();
+    await mead.transfer(alice.address, meadCost);
+    await mead.connect(alice).approve(purchaser.address, ethers.constants.MaxUint256);
 
-  //   await purchaser.connect(alice).purchaseWithMead("test");
-  //   expect(await brewery.balanceOf(alice.address)).to.be.equal(1);
-  //   expect(await mead.balanceOf(alice.address)).to.be.equal(0);
-  // });
+    await purchaser.connect(alice).purchaseWithMead("test");
+    expect(await brewery.balanceOf(alice.address)).to.be.equal(1);
+    expect(await mead.balanceOf(alice.address)).to.be.equal(0);
+  });
 
-  // it("Purchase with usdc", async () => {
-  //   await usdc.connect(alice).approve(purchaser.address, ethers.constants.MaxUint256);
-  //   await purchaser.setUSDCEnabled(true);
+  it("Purchase with usdc", async () => {
+    await usdc.connect(alice).approve(purchaser.address, ethers.constants.MaxUint256);
+    await purchaser.setUSDCEnabled(true);
 
-  //   const discount = await purchaser.usdcDiscount();
-  //   const usdcCost = await purchaser.getUSDCForMead(await settings.breweryCost());
-  //   const actualPercentage = BigNumber.from(1e4).sub(discount);
-  //   const actualCost = usdcCost.mul(actualPercentage).div(1e4);
+    const discount = await purchaser.usdcDiscount();
+    const usdcCost = await purchaser.getUSDCForMead(await settings.breweryCost());
+    const actualPercentage = BigNumber.from(1e4).sub(discount);
+    const actualCost = usdcCost.mul(actualPercentage).div(1e4);
 
-  //   const tavern0 = await usdc.balanceOf(tavernsKeep.address);
-  //   await purchaser.connect(alice).purchaseWithUSDC("test");
-  //   const tavern1 = await usdc.balanceOf(tavernsKeep.address);
+    const tavern0 = await usdc.balanceOf(tavernsKeep.address);
+    await purchaser.connect(alice).purchaseWithUSDC("test");
+    const tavern1 = await usdc.balanceOf(tavernsKeep.address);
 
-  //   expect(tavern1.sub(tavern0)).to.be.equal(actualCost);
-  //   expect(await brewery.balanceOf(alice.address)).to.be.equal(1);
-  // });
+    expect(tavern1.sub(tavern0)).to.be.equal(actualCost);
+    expect(await brewery.balanceOf(alice.address)).to.be.equal(1);
+  });
 
-  // it("Purchase with LP", async () => {
-  //   const LP = <IJoePair>await ethers.getContractAt("IJoePair", await settings.liquidityPair());
-  //   await LP.connect(alice).approve(purchaser.address, ethers.constants.MaxUint256);
-  //   await purchaser.setLPEnabled(true);
+  it("Purchase with LP", async () => {
+    const LP = <IJoePair>await ethers.getContractAt("IJoePair", await settings.liquidityPair());
+    await LP.connect(alice).approve(purchaser.address, ethers.constants.MaxUint256);
+    await purchaser.setLPEnabled(true);
 
-  //   const usdcCost = await purchaser.getUSDCForMead(await settings.breweryCost());
-  //   const lpCost = await purchaser.getLPFromUSDC(usdcCost);
-  //   const discount = await purchaser.calculateLPDiscount();
-  //   const actualPercentage = BigNumber.from(1e4).sub(discount);
-  //   const actualCost = lpCost.mul(actualPercentage).div(1e4);
-  //   await LP.transfer(alice.address, lpCost);
+    const usdcCost = await purchaser.getUSDCForMead(await settings.breweryCost());
+    const lpCost = await purchaser.getLPFromUSDC(usdcCost);
+    const discount = await purchaser.calculateLPDiscount();
+    const actualPercentage = BigNumber.from(1e4).sub(discount);
+    const actualCost = lpCost.mul(actualPercentage).div(1e4);
+    await LP.transfer(alice.address, lpCost);
 
-  //   const tavern0 = await LP.balanceOf(tavernsKeep.address);
-  //   await purchaser.connect(alice).purchaseWithLP("test");
-  //   const tavern1 = await LP.balanceOf(tavernsKeep.address);
+    const tavern0 = await LP.balanceOf(tavernsKeep.address);
+    await purchaser.connect(alice).purchaseWithLP("test");
+    const tavern1 = await LP.balanceOf(tavernsKeep.address);
 
-  //   expect(tavern1.sub(tavern0)).to.be.equal(actualCost);
-  //   expect(await brewery.balanceOf(alice.address)).to.be.equal(1);
-  // });
+    expect(tavern1.sub(tavern0)).to.be.equal(actualCost);
+    expect(await brewery.balanceOf(alice.address)).to.be.equal(1);
+  });
 
   it("Purchase with LP Zap", async () => {
     await usdc.connect(alice).approve(purchaser.address, ethers.constants.MaxUint256);
