@@ -17,7 +17,10 @@ async function main() {
     const Renovation = await ethers.getContractAt("Renovation", renovation_address);
 
     // 3 is a type change, 4 is the magic type
-    await Renovation.create(deployer.address, "1", "00000", "");
+
+    const renovationType = 3;
+    const breweryType = 7;
+    //await Renovation.create(deployer.address, renovationType, breweryType, "");
     console.log("Created a renovation!")
 
     await Brewery.upgrade("1", "1");
