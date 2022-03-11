@@ -69,8 +69,8 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         usdcDiscount = 500;     // 5%
         liquidityRatio0 = 100;  // 1%
         liquidityRatio1 = 2000; // 20%
-        lpDiscount0 = 100;     // 25%
-        lpDiscount1 = 2500;      // 1%
+        lpDiscount0 = 2500;     // 25%
+        lpDiscount1 = 100;      // 1%
         zapSlippage = 1000;     // 10%
         zapFee = 100;           // 1%
     }
@@ -251,16 +251,16 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         uint256 liquidityRatio = calculateLiquidityRatio();
 
         if (liquidityRatio <= liquidityRatio0) {
-            return lpDiscount1;
+            return lpDiscount0;
         }
 
         if (liquidityRatio >= liquidityRatio1) {
-            return lpDiscount0;
+            return lpDiscount1;
         }
 
         // X is liquidity ratio       (y0 = 5      y1 = 20)
         // Y is discount              (x0 = 15     x1 =  1)
-        return (lpDiscount1 * (liquidityRatio1 - liquidityRatio) + lpDiscount0 * (liquidityRatio - liquidityRatio0)) / (liquidityRatio1 - liquidityRatio0);
+        return (lpDiscount0 * (liquidityRatio1 - liquidityRatio) + lpDiscount1 * (liquidityRatio - liquidityRatio0)) / (liquidityRatio1 - liquidityRatio0);
     }
 
     /**
