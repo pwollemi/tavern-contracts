@@ -92,56 +92,69 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
     /**
      * @notice Purchases a BREWERY using MEAD
      */
-    function purchaseWithXMead(string memory name) external {
+    function purchaseWithXMead(uint256 amount) external {
+        require(amount <= settings.txLimit(), "Cant go above tx limit!");
 
-        uint256 xMeadAmount = settings.xMeadCost();
+        uint256 xMeadAmount = amount * settings.xMeadCost();
         XMead(settings.xmead()).redeem(msg.sender, xMeadAmount);
 
         // Mint logic
-        _mint(msg.sender, name, settings.reputationForMead());
+        for (uint256 i = 0; i < amount; ++i) {
+            _mint(msg.sender, "", settings.reputationForMead());
+        }
     }
 
     /**
      * @notice Purchases a BREWERY using MEAD
      */
-    function purchaseWithMead(string memory name) external {
-        uint256 meadAmount = settings.breweryCost();
+    function purchaseWithMead(uint256 amount) external {
+        require(amount <= settings.txLimit(), "Cant go above tx limit!");
+
+        uint256 meadAmount = amount * settings.breweryCost();
         IERC20Upgradeable(settings.mead()).safeTransferFrom(msg.sender, settings.tavernsKeep(), meadAmount * settings.treasuryFee() / settings.PRECISION());
         IERC20Upgradeable(settings.mead()).safeTransferFrom(msg.sender, settings.rewardsPool(), meadAmount * settings.rewardPoolFee() / settings.PRECISION());
 
         // Mint logic
-        _mint(msg.sender, name, settings.reputationForMead());
+        for (uint256 i = 0; i < amount; ++i) {
+            _mint(msg.sender, "", settings.reputationForMead());
+        }
     }
 
     /**
      * @notice Purchases a BREWERY using USDC
      */
-    function purchaseWithUSDC(string memory name) external {
+    function purchaseWithUSDC(uint256 amount) external {
+        require(amount <= settings.txLimit(), "Cant go above tx limit!");
         require(isUSDCEnabled, "USDC discount off");
 
         // Take payment for USDC tokens
-        uint256 usdcAmount = getUSDCForMead(settings.breweryCost()) * (settings.PRECISION() - usdcDiscount) / settings.PRECISION();
+        uint256 usdcAmount = amount * getUSDCForMead(settings.breweryCost()) * (settings.PRECISION() - usdcDiscount) / settings.PRECISION();
         IERC20Upgradeable(settings.usdc()).safeTransferFrom(msg.sender, settings.tavernsKeep(), usdcAmount);
 
         // Mint logic
-        _mint(msg.sender, name, settings.reputationForUSDC());
+        for (uint256 i = 0; i < amount; ++i) {
+            _mint(msg.sender, "", settings.reputationForUSDC());
+        }
     }
     
     /**
      * @notice Purchases a BREWERY using LP tokens
      */
-    function purchaseWithLP(string memory name) external {
+    function purchaseWithLP(uint256 amount) external {
+        require(amount <= settings.txLimit(), "Cant go above tx limit!");
         require(isLPEnabled, "LP discount off");
 
         // Take payment in MEAD-USDC LP tokens
         uint256 discount = calculateLPDiscount();
-        uint256 breweryPriceInUSDC = getUSDCForMead(settings.breweryCost());
+        uint256 breweryPriceInUSDC = amount * getUSDCForMead(settings.breweryCost());
         uint256 breweryPriceInLP = getLPFromUSDC(breweryPriceInUSDC);
         uint256 discountAmount = breweryPriceInLP * discount / 1e4;
         IJoePair(settings.liquidityPair()).transferFrom(msg.sender, settings.tavernsKeep(), breweryPriceInLP - discountAmount);
 
         // Mint logic
-        _mint(msg.sender, name, settings.reputationForLP());
+        for (uint256 i = 0; i < amount; ++i) {
+            _mint(msg.sender, "", settings.reputationForLP());
+        }
     }
 
     /**
