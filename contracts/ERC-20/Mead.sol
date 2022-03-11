@@ -163,12 +163,16 @@ contract Mead is Initializable, IERC20Upgradeable, OwnableUpgradeable {
         require(!blacklist[from] && !blacklist[to], "Address blacklisted");
 
         // If either sender or receiver are not whitelisted, then check that trading is enabled before continuing
-        if (!whitelist[from] || !whitelist[to]) {
-            require(isTradingEnabled, "Cannot trade yet!");
-        }
+        // and also if it is a buy as well ensure the wallet doesnt go over limits
+        // if (!whitelist[from] || !whitelist[to]) {
+        //     // Check account 
+        //     if (from == liquidityPair) {
+        //         require(_balances[msg.sender] + amount <= (totalSupply() / 100), "ANTI-BOT: Cannot have more than 1% of supply");
+        //     }
+        // }
 
         if (to == liquidityPair) {
-            require(Brewery(breweryAddress).balanceOf(msg.sender) > 0, "User must have more than one node for launch");
+            require(Brewery(breweryAddress).balanceOf(msg.sender) > 0, "ANTI-BOT: User must have more than one node to sell on launch");
         }
 
         // Whether or not we are taking a fee
