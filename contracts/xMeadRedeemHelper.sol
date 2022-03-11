@@ -85,13 +85,13 @@ contract xMeadRedeemHelper is Initializable, AccessControlUpgradeable {
         // Otherwise we need to check if the limits have been used
         if (hasRole(BYPASS_ROLE, msg.sender)) {
             XMead(settings.xmead()).redeem(msg.sender, amount);
-            IERC20Upgradeable(settings.mead()).safeTransferFrom(settings.rewardsPool(), msg.sender, amount);
+            IERC20Upgradeable(settings.mead()).safeTransferFrom(settings.redeemPool(), msg.sender, amount);
         } else {
             uint256 unlocked = unlockedAmount(msg.sender);
             require(redeems[msg.sender] + amount <= unlocked, "You cant redeem more than your allowance");
 
             XMead(settings.xmead()).redeem(msg.sender, amount);
-            IERC20Upgradeable(settings.mead()).safeTransferFrom(settings.rewardsPool(), msg.sender, amount);
+            IERC20Upgradeable(settings.mead()).safeTransferFrom(settings.redeemPool(), msg.sender, amount);
         }
 
         redeems[msg.sender] += amount;
