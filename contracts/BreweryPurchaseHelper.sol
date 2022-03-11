@@ -211,17 +211,24 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         return liquidity;
     }
 
+    function getMeadSupply() public view returns (uint256) {
+        return Mead(settings.mead()).totalSupply() / 10**ERC20Upgradeable(settings.mead()).decimals();
+    }
+
+    function getFDV() public view returns (uint256) {
+        return getUSDCForOneMead() * getMeadSupply();
+    }
+
     /**
      * @notice Calculates the liquidity ratio
      */
     function calculateLiquidityRatio() public view returns (uint256) {
-        (, uint usdcReserves,) = settings.liquidityPair().getReserves();
+        uint256 usdcReserves = getUSDCReserve();
 
-        uint256 meadSupply = Mead(settings.mead()).totalSupply() / 10**Mead(settings.mead()).decimals();
-        uint256 fullyDilutedValue = getUSDCForOneMead() * meadSupply;
+        uint256 fdv = getFDV();
 
         // If this is 5% its bad, if this is 20% its good
-        return usdcReserves * 1e4 / fullyDilutedValue;
+        return usdcReserves * 1e4 / fdv;
     }
 
     /**

@@ -7,4 +7,4 @@ export const Brewery_address = '0xf5E723f0FD54f8c75f0Da8A8F9D68Bf67B20b850';
 export const renovation_address = '0x45683E8b503C85447e782c98Fd54234cd9a3B621';
 export const RedeemHelper_address = '0x2f54fc9EF1B3a0259cC8DC5B1047edC2670F460E';
 export const RenovationHelper_address = '0xF927b85524EACeC293068c4f0d35D9cbedd0b18D';
-export const BreweryHelper_address = '0x03C9F5C3F23178ec04FA02980Dc720669315D1e4';
+export const BreweryHelper_address = '0xde0c3DE84c69e2A3dfa1F872db63c88250056706';
