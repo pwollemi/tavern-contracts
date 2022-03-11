@@ -135,10 +135,10 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
 
         // Take payment in MEAD-USDC LP tokens
         uint256 discount = calculateLPDiscount();
-        require(discount <= lpDiscount1, "LP discount off");
         uint256 breweryPriceInUSDC = getUSDCForMead(settings.breweryCost());
         uint256 breweryPriceInLP = getLPFromUSDC(breweryPriceInUSDC);
-        settings.liquidityPair().transferFrom(msg.sender, settings.tavernsKeep(), breweryPriceInLP * (settings.PRECISION() - discount) / settings.PRECISION());
+        uint256 discountAmount = breweryPriceInLP * discount / 1e4;
+        IJoePair(settings.liquidityPair()).transferFrom(msg.sender, settings.tavernsKeep(), breweryPriceInLP - discountAmount);
 
         // Mint logic
         _mint(msg.sender, name, settings.reputationForLP());
@@ -325,11 +325,11 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         usdcDiscount = _discount;
     }
 
-    function setMinLiquidityDiscount(uint256 _discount) external onlyOwner {
+    function setMaxLiquidityDiscount(uint256 _discount) external onlyOwner {
         lpDiscount0 = _discount;
     }
 
-    function setMaxLiquidityDiscount(uint256 _discount) external onlyOwner {
+    function setMinLiquidityDiscount(uint256 _discount) external onlyOwner {
         lpDiscount1 = _discount;
     }
 
