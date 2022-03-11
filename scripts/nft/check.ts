@@ -25,7 +25,8 @@ async function main() {
     }
 
     /// Your Account
-    const account = deployer.address;
+    const account = "0xc198CAe628C26076Cf94D1bfDf67E021D908646D";
+
     console.log("\n\n==== BREWERS STATS ====")
     console.log("\tClass:", (await ClassManager.getClass(account)).toString());
     console.log("\tReputation:", (await ClassManager.getReputation(account)).toString());
@@ -34,28 +35,31 @@ async function main() {
     console.log("\tPending Rewards:", ethers.utils.formatUnits(await Brewery.getTotalPendingMead(account), 18), "MEAD");
 
     /// SPECIFIC BREWERY INFO
-    const id = "1";
-    const stats = await Brewery.breweryStats(id);
-
-    console.log("\n\n==== Token", id, "====")
-    console.log("\tName:", stats.name);
-    console.log("\tOwner:", await Brewery.ownerOf(id));
-    console.log("\tURI:", await Brewery.tokenURI(id));
-    console.log("\tType:", stats.type_.toString());
-    console.log("\tCurrent Tier:", stats.tier.toString());
-    const xp = (await Brewery.getPendingXp(id)).add(stats.xp);
-    console.log("\tCurrent Xp:", xp.toString());
-
-    let datetime = dateString(Number(stats.lastTimeClaimed) * 1000);
-
-    console.log("\tProduction Rate:", ethers.utils.formatUnits((await Brewery.getProductionRatePerSecond(id)).mul(86400), 18), "MEAD/day");
-    console.log("\tPending Rewards:", ethers.utils.formatUnits(await Brewery.pendingMead(id), 18), "MEAD")
-    console.log("\tReward Period:", (await Brewery.getRewardPeriod(stats.lastTimeClaimed)).toString(), "s");
-    console.log("\tLast Claim:", datetime);
-    console.log("\tTotal Claimed:", ethers.utils.formatUnits(stats.totalYield, 18));
-    console.log("\tProduction Rate Multiplier:", ethers.utils.formatUnits(stats.productionRatePerSecondMultiplier, 2) + "%");
-    console.log("\tFermentation Period Multiplier:", ethers.utils.formatUnits(stats.fermentationPeriodMultiplier, 2) + "%");
-    console.log("\tExperience Multiplier:", ethers.utils.formatUnits(stats.experienceMultiplier, 2) + "%");
+    const balance = await Brewery.balanceOf(account);
+    for (let i = 0; i < Number(balance.toString()); ++i) {
+        const id = await Brewery.tokenOfOwnerByIndex(account, i);
+        const stats = await Brewery.breweryStats(id);
+    
+        console.log("\n\n==== Token", id, "====")
+        console.log("\tName:", stats.name);
+        console.log("\tOwner:", await Brewery.ownerOf(id));
+        console.log("\tURI:", await Brewery.tokenURI(id));
+        console.log("\tType:", stats.type_.toString());
+        console.log("\tCurrent Tier:", stats.tier.toString());
+        const xp = (await Brewery.getPendingXp(id)).add(stats.xp);
+        console.log("\tCurrent Xp:", xp.toString());
+    
+        let datetime = dateString(Number(stats.lastTimeClaimed) * 1000);
+    
+        console.log("\tProduction Rate:", ethers.utils.formatUnits((await Brewery.getProductionRatePerSecond(id)).mul(86400), 18), "MEAD/day");
+        console.log("\tPending Rewards:", ethers.utils.formatUnits(await Brewery.pendingMead(id), 18), "MEAD")
+        console.log("\tReward Period:", (await Brewery.getRewardPeriod(stats.lastTimeClaimed)).toString(), "s");
+        console.log("\tLast Claim:", datetime);
+        console.log("\tTotal Claimed:", ethers.utils.formatUnits(stats.totalYield, 18));
+        console.log("\tProduction Rate Multiplier:", ethers.utils.formatUnits(stats.productionRatePerSecondMultiplier, 2) + "%");
+        console.log("\tFermentation Period Multiplier:", ethers.utils.formatUnits(stats.fermentationPeriodMultiplier, 2) + "%");
+        console.log("\tExperience Multiplier:", ethers.utils.formatUnits(stats.experienceMultiplier, 2) + "%");
+    }
 }
 
 main()

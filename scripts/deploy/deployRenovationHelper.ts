@@ -12,7 +12,7 @@ async function main() {
 
     const renovation = await ethers.getContractAt("Renovation", renovation_address);
     const xMead = await ethers.getContractAt("XMead", xMead_address);
-    const RenovationHelper = await deployProxy("Renovation", Brewery_address);
+    const RenovationHelper = await deployProxy("RenovationPurchaseHelper", settings_address);
     console.log("RenovationHelper: ", RenovationHelper.address);
 
     // *  - Helper needs to be able to mint renovations (Renovation::CREATOR_ROLE)

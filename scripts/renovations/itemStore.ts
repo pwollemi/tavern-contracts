@@ -11,23 +11,12 @@ import { Brewery_address, renovation_address, settings_address, xMead_address } 
 
 async function main() {
     // The signers
-    const [alice, bob] = await ethers.getSigners();
-    console.log(alice.address);
-    console.log(bob.address);
-
-    const deployerAddress = '0xf0D41ED017dB1eBA5f58E705681c2f312BfAc5AC';
-    const oldDeployerAddress = '0x145d729EAe53DEA212cE970558D6Eb1846D15d20';
-    const holderAddress = '0xc198CAe628C26076Cf94D1bfDf67E021D908646D'
-    await impersonateAccount(deployerAddress);
-    await impersonateAccount(oldDeployerAddress);
-    await impersonateAccount(holderAddress);
-    const deployer = await ethers.getSigner(deployerAddress);
-    const oldDeployer = await ethers.getSigner(oldDeployerAddress);
-    const holder = await ethers.getSigner(holderAddress);
+    const [deployer] = await ethers.getSigners();
 
     const xMead = await ethers.getContractAt("XMead", xMead_address);
     const Renovation = await ethers.getContractAt("Renovation", renovation_address);
 
+    // Deploy the renovation purcahse helper
     const RenovationPurchaseHelper = await deployProxy("RenovationPurchaseHelper", settings_address);
 
     // Give mint rights

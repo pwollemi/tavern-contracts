@@ -26,6 +26,8 @@ contract Renovation is Initializable, AccessControlUpgradeable, ERC721Enumerable
     /// @notice The specific role to give to things so they can consume Renovations
     bytes32 public constant CONSUMER_ROLE = keccak256("CONSUMER_ROLE");
 
+    uint256 public totalRenovations;
+
     /// @notice Modifier to test that the caller has a specific role (interface to AccessControl)
     modifier isRole(bytes32 role) {
         require(hasRole(role, msg.sender), "Incorrect role!");
@@ -50,8 +52,9 @@ contract Renovation is Initializable, AccessControlUpgradeable, ERC721Enumerable
     }
 
     function create(address to, uint256 _type, uint256 intValue, string memory strValue) external isRole(CREATOR_ROLE) returns(uint256) {
-        uint256 id = totalSupply() + 1;
+        uint256 id = totalRenovations + 1;
         _safeMint(to, id);
+        totalRenovations++;
 
         renovations[id].renovationType = _type;
         renovations[id].intValue = intValue;
@@ -78,5 +81,9 @@ contract Renovation is Initializable, AccessControlUpgradeable, ERC721Enumerable
 
     function getStrValue(uint256 _renovationId) external view returns(string memory) {
         return renovations[_renovationId].strValue;
+    }
+
+    function setTotalRenovations(uint256 _total) external isRole(DEFAULT_ADMIN_ROLE) {
+        totalRenovations = _total;
     }
 }
