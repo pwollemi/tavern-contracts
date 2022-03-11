@@ -10,12 +10,14 @@ import "./TavernSettings.sol";
 import "./ERC-721/Brewery.sol";
 import "./ClassManager.sol";
 import "./ERC-20/xMead.sol";
+import "./ERC-20/Mead.sol";
 
 /**
  * @notice There are some conditions to make this work
  * 
  *  - Helper needs to be the owner of Brewery
  *  - Helper should be able to burn xMEAD
+ *  - Helper should be able to award reputation
  * 
  */
 contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
@@ -64,13 +66,13 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         settings = TavernSettings(_settings);
         brewery = Brewery(_brewery);
 
-        usdcDiscount = 5 * settings.PRECISION() / 100;
-        liquidityRatio0 = 1 * settings.PRECISION() / 100;
-        liquidityRatio1 = 20 * settings.PRECISION() / 100;
-        lpDiscount0 = 1 * settings.PRECISION() / 100;
-        lpDiscount1 = 25 * settings.PRECISION() / 100;
-        zapSlippage = 10 * settings.PRECISION() / 100;
-        zapFee = 1 * settings.PRECISION() / 100;
+        usdcDiscount = 500;     // 5%
+        liquidityRatio0 = 100;  // 1%
+        liquidityRatio1 = 2000; // 20%
+        lpDiscount0 = 100;      // 1%
+        lpDiscount1 = 2500;     // 25%
+        zapSlippage = 1000;     // 10%
+        zapFee = 100;           // 1%
     }
 
     /**
@@ -129,7 +131,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
      * @notice Purchases a BREWERY using LP tokens
      */
     function purchaseWithLP(string memory name) external {
-        require(isLPEnabled, "USDC discount off");
+        require(isLPEnabled, "LP discount off");
 
         // Take payment in MEAD-USDC LP tokens
         uint256 discount = calculateLPDiscount();
@@ -210,14 +212,23 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
     }
 
     /**
+     * @notice Calculates the liquidity ratio
+     */
+    function calculateLiquidityRatio() public view returns (uint256) {
+        (, uint usdcReserves,) = settings.liquidityPair().getReserves();
+
+        uint256 meadSupply = Mead(settings.mead()).totalSupply() / 10**Mead(settings.mead()).decimals();
+        uint256 fullyDilutedValue = getUSDCForOneMead() * meadSupply;
+
+        // If this is 5% its bad, if this is 20% its good
+        return usdcReserves * 1e4 / fullyDilutedValue;
+    }
+
+    /**
      * @notice Calculates the current LP discount
      */
     function calculateLPDiscount() public view returns (uint256) {
-        (, uint usdcReserves,) = settings.liquidityPair().getReserves();
-        uint256 fullyDilutedValue = getUSDCForOneMead() * IERC20Upgradeable(settings.mead()).totalSupply();
-
-        // If this is 5% its bad, if this is 20% its good
-        uint256 liquidityRatio = usdcReserves * settings.PRECISION() / fullyDilutedValue / 100;
+        uint256 liquidityRatio = calculateLiquidityRatio();
 
         if (liquidityRatio <= liquidityRatio0) {
             return lpDiscount1;
