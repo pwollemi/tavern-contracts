@@ -69,8 +69,8 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         usdcDiscount = 500;     // 5%
         liquidityRatio0 = 100;  // 1%
         liquidityRatio1 = 2000; // 20%
-        lpDiscount0 = 100;      // 1%
-        lpDiscount1 = 2500;     // 25%
+        lpDiscount0 = 2500;     // 25%
+        lpDiscount1 = 100;      // 1%
         zapSlippage = 1000;     // 10%
         zapFee = 100;           // 1%
     }
