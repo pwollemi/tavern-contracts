@@ -30,6 +30,9 @@ async function main() {
 
     console.log("My LP Balance:", ethers.utils.formatUnits(await pair.balanceOf(deployer.address), await pair.decimals()));
 
+    const meadSupplyOnChain = await BreweryHelper.getMeadSupply();
+    const FDVOnChain = await BreweryHelper.getFDV();
+    const lpRatio = await BreweryHelper.calculateLiquidityRatio();
     const lpDiscount = await BreweryHelper.calculateLPDiscount();
     const usdcReserves = await BreweryHelper.getUSDCReserve();
     const LPPrice = await BreweryHelper.getUSDCForOneLP();
@@ -38,6 +41,10 @@ async function main() {
     const meadPrice = await BreweryHelper.getUSDCForOneMead();
     const meadPrice2 = await BreweryHelper.getUSDCForMead(ethers.utils.parseUnits("1", 18));
 
+    console.log("Mead Supply ONCHAIN", meadSupplyOnChain);
+    console.log("FDV ONCHAIN", FDVOnChain);
+    console.log("USDV RESERVES ONCHAIN", usdcReserves);
+    console.log("LP Ratio", lpRatio);
     console.log("LP Discount", ethers.utils.formatUnits(lpDiscount, 2));
     console.log("USDC Reserves", ethers.utils.formatUnits(usdcReserves, 6))
     console.log("Price in USDC of 1 LP token", ethers.utils.formatUnits(LPPrice, 6));
@@ -53,8 +60,6 @@ async function main() {
 
     const liquidityRatio = usdcReserves.mul(1e4).div(FDV);
     console.log("Liquidity Ratio", liquidityRatio);
-
-    
 
     // If this is 5% its bad, if this is 20% its good
     //uint256 liquidityRatio = usdcReserves * settings.PRECISION() / fullyDilutedValue / 100;
