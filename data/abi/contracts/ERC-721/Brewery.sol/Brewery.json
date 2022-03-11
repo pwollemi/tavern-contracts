@@ -891,6 +891,19 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "maxBreweries",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -1318,6 +1331,19 @@
       }
     ],
     "name": "setGlobalProductionRatePerSecond",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "maxLimit",
+        "type": "uint256"
+      }
+    ],
+    "name": "setMaxBreweries",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

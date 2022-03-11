@@ -97,6 +97,9 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
     /// @notice A mapping of which addresses are not allowed to trade or approve BREWERYs
     mapping (address => bool) public blacklist;
 
+    /// @notice The total amount of breweries (totalSupply cant go over this)
+    uint256 public maxBreweries;
+
     function initialize(
         address _tavernSettings,
         uint256 _fermentationPeriod,
@@ -124,11 +127,11 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
     }
 
     /**
-     * @notice Mints a new tokenID, checking if the string name already exists
-     * @dev The BreweryPurchaseHelper and other helpers will use this function to create BREWERYs
+     * @notice Mints a new tokenID
      */
-    function mint(address _to, string memory _name) public isRole(MINTER_ROLE) {
-        require(balanceOf(_to) + 1 <= settings.walletLimit(), "Cant go over limit");
+    function _mint(address _to, string memory _name) internal {
+        require(totalSupply() + 1 <= maxBreweries, "Cant go over total limit");
+        require(balanceOf(_to) + 1 <= settings.walletLimit(), "Cant go over wallet limit");
         uint256 tokenId = totalSupply() + 1;
         _safeMint(_to, tokenId);
         breweryStats[tokenId] = BreweryStats({
@@ -143,6 +146,14 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
             totalYield: 0,
             lastTimeClaimed: block.timestamp
         });
+    }
+
+    /**
+     * @notice Public interface to the `_mint` function to test that address has MINTER_ROLE
+     * @dev The BreweryPurchaseHelper and other helpers will use this function to create BREWERYs
+     */
+    function mint(address _to, string memory _name) public isRole(MINTER_ROLE) {
+       _mint(_to, _name);
     }
 
     /**
@@ -201,7 +212,7 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
 
         // For each, mint a new BREWERY
         for (uint256 i = 0; i < _amount; ++i) {
-            mint(msg.sender, "");
+            _mint(msg.sender, "");
             ClassManager(settings.classManager()).addReputation(msg.sender, settings.reputationForMead());
         }
 
@@ -676,5 +687,9 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
 
     function setBlacklisted(address account, bool value) external onlyRole(DEFAULT_ADMIN_ROLE) {
         blacklist[account] = value;
+    }
+
+    function setMaxBreweries(uint256 maxLimit) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        maxBreweries = maxLimit;
     }
 }
