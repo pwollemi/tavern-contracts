@@ -69,8 +69,8 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         usdcDiscount = 500;     // 5%
         liquidityRatio0 = 100;  // 1%
         liquidityRatio1 = 2000; // 20%
-        lpDiscount0 = 2500;     // 25%
-        lpDiscount1 = 100;      // 1%
+        lpDiscount0 = 100;      // 1%
+        lpDiscount1 = 2500;     // 25%
         zapSlippage = 1000;     // 10%
         zapFee = 100;           // 1%
     }
@@ -211,24 +211,17 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         return liquidity;
     }
 
-    function getMeadSupply() public view returns (uint256) {
-        return Mead(settings.mead()).totalSupply() / 10**ERC20Upgradeable(settings.mead()).decimals();
-    }
-
-    function getFDV() public view returns (uint256) {
-        return getUSDCForOneMead() * getMeadSupply();
-    }
-
     /**
      * @notice Calculates the liquidity ratio
      */
     function calculateLiquidityRatio() public view returns (uint256) {
-        uint256 usdcReserves = getUSDCReserve();
+        (, uint usdcReserves,) = settings.liquidityPair().getReserves();
 
-        uint256 fdv = getFDV();
+        uint256 meadSupply = Mead(settings.mead()).totalSupply() / 10**Mead(settings.mead()).decimals();
+        uint256 fullyDilutedValue = getUSDCForOneMead() * meadSupply;
 
         // If this is 5% its bad, if this is 20% its good
-        return usdcReserves * 1e4 / fdv;
+        return usdcReserves * 1e4 / fullyDilutedValue;
     }
 
     /**
@@ -247,7 +240,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
 
         // X is liquidity ratio       (y0 = 5      y1 = 20)
         // Y is discount              (x0 = 15     x1 =  1)
-        return (lpDiscount0 * (liquidityRatio1 - liquidityRatio) + lpDiscount1 * (liquidityRatio - liquidityRatio0)) / (liquidityRatio1 - liquidityRatio0);
+        return (lpDiscount1 * (liquidityRatio1 - liquidityRatio) + lpDiscount0 * (liquidityRatio - liquidityRatio0)) / (liquidityRatio1 - liquidityRatio0);
     }
 
     /**
