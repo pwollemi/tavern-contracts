@@ -40,8 +40,9 @@ async function main() {
         const lpTokensFor500k = await BreweryHelper.getLPFromUSDC(ethers.utils.parseUnits("500000", 6));
         const meadForUsdc = await BreweryHelper.getMeadforUSDC();
         const meadPrice = await BreweryHelper.getUSDCForOneMead();
-        const meadPrice2 = await BreweryHelper.getUSDCForMead(ethers.utils.parseUnits("1", 18));
-    
+        const breweryPrice = await BreweryHelper.getUSDCForMead(ethers.utils.parseUnits("100", 18));
+        const breweryPriceInLp = await BreweryHelper.getLPFromUSDC(breweryPrice);
+
         console.log("Mead Supply ONCHAIN", meadSupplyOnChain);
         console.log("FDV ONCHAIN", FDVOnChain);
         console.log("USDV RESERVES ONCHAIN", usdcReserves);
@@ -52,59 +53,60 @@ async function main() {
         console.log("LP value of 500k USDC", ethers.utils.formatUnits(lpTokensFor500k, 18));
         console.log("Mead value of 1 USDC", ethers.utils.formatUnits(meadForUsdc, 18));
         console.log("Mead Price", ethers.utils.formatUnits(meadPrice, 6));
-        console.log("Mead Price", ethers.utils.formatUnits(meadPrice2, 6));
+        console.log("Brewery Price (in USD)", ethers.utils.formatUnits(breweryPrice, 6));
+        console.log("Brewery price (in LP)", ethers.utils.formatUnits(breweryPriceInLp, await pair.decimals()))
     }
    
     //await mead.enableTrading();
     //console.log("Enabled trading!");
 
-    const router = await ethers.getContractAt("IJoeRouter02", await settings.dexRouter());
+    // const router = await ethers.getContractAt("IJoeRouter02", await settings.dexRouter());
 
-    let meadBalance = await mead.balanceOf(deployer.address);
-    let usdcBalance = await usdc.balanceOf(deployer.address);
-    console.log("Mead", ethers.utils.formatUnits(meadBalance, 18));
-    console.log("USDC", ethers.utils.formatUnits(usdcBalance, 6));
+    // let meadBalance = await mead.balanceOf(deployer.address);
+    // let usdcBalance = await usdc.balanceOf(deployer.address);
+    // console.log("Mead", ethers.utils.formatUnits(meadBalance, 18));
+    // console.log("USDC", ethers.utils.formatUnits(usdcBalance, 6));
 
-    await usdc.approve(router.address, ethers.constants.MaxUint256);
-    await mead.approve(router.address, ethers.constants.MaxUint256);
-    await router.swapExactTokensForTokens(
-        ethers.utils.parseUnits("100000", 6),
-        0, 
-        [USDC_MAINNET, Mead_address], 
-        deployer.address, 
-        Math.round(Date.now()/1000) + 360
-    );
-    console.log("Bought tokens!");
+    // await usdc.approve(router.address, ethers.constants.MaxUint256);
+    // await mead.approve(router.address, ethers.constants.MaxUint256);
+    // await router.swapExactTokensForTokens(
+    //     ethers.utils.parseUnits("1000000", 6),
+    //     0, 
+    //     [USDC_MAINNET, Mead_address], 
+    //     deployer.address, 
+    //     Math.round(Date.now()/1000) + 360
+    // );
+    // console.log("Bought tokens!");
 
-    meadBalance = await mead.balanceOf(deployer.address);
-    usdcBalance = await usdc.balanceOf(deployer.address);
-    console.log("Mead", ethers.utils.formatUnits(meadBalance, 18));
-    console.log("USDC", ethers.utils.formatUnits(usdcBalance, 6));
+    // meadBalance = await mead.balanceOf(deployer.address);
+    // usdcBalance = await usdc.balanceOf(deployer.address);
+    // console.log("Mead", ethers.utils.formatUnits(meadBalance, 18));
+    // console.log("USDC", ethers.utils.formatUnits(usdcBalance, 6));
 
-    {
-        const meadSupplyOnChain = await BreweryHelper.getMeadSupply();
-        const FDVOnChain = await BreweryHelper.getFDV();
-        const lpRatio = await BreweryHelper.calculateLiquidityRatio();
-        const lpDiscount = await BreweryHelper.calculateLPDiscount();
-        const usdcReserves = await BreweryHelper.getUSDCReserve();
-        const LPPrice = await BreweryHelper.getUSDCForOneLP();
-        const lpTokensFor500k = await BreweryHelper.getLPFromUSDC(ethers.utils.parseUnits("500000", 6));
-        const meadForUsdc = await BreweryHelper.getMeadforUSDC();
-        const meadPrice = await BreweryHelper.getUSDCForOneMead();
-        const meadPrice2 = await BreweryHelper.getUSDCForMead(ethers.utils.parseUnits("1", 18));
+    // {
+    //     const meadSupplyOnChain = await BreweryHelper.getMeadSupply();
+    //     const FDVOnChain = await BreweryHelper.getFDV();
+    //     const lpRatio = await BreweryHelper.calculateLiquidityRatio();
+    //     const lpDiscount = await BreweryHelper.calculateLPDiscount();
+    //     const usdcReserves = await BreweryHelper.getUSDCReserve();
+    //     const LPPrice = await BreweryHelper.getUSDCForOneLP();
+    //     const lpTokensFor500k = await BreweryHelper.getLPFromUSDC(ethers.utils.parseUnits("500000", 6));
+    //     const meadForUsdc = await BreweryHelper.getMeadforUSDC();
+    //     const meadPrice = await BreweryHelper.getUSDCForOneMead();
+    //     const meadPrice2 = await BreweryHelper.getUSDCForMead(ethers.utils.parseUnits("1", 18));
     
-        console.log("Mead Supply ONCHAIN", meadSupplyOnChain);
-        console.log("FDV ONCHAIN", FDVOnChain);
-        console.log("USDV RESERVES ONCHAIN", usdcReserves);
-        console.log("LP Ratio", lpRatio);
-        console.log("LP Discount", ethers.utils.formatUnits(lpDiscount, 2));
-        console.log("USDC Reserves", ethers.utils.formatUnits(usdcReserves, 6))
-        console.log("Price in USDC of 1 LP token", ethers.utils.formatUnits(LPPrice, 6));
-        console.log("LP value of 500k USDC", ethers.utils.formatUnits(lpTokensFor500k, 18));
-        console.log("Mead value of 1 USDC", ethers.utils.formatUnits(meadForUsdc, 18));
-        console.log("Mead Price", ethers.utils.formatUnits(meadPrice, 6));
-        console.log("Mead Price", ethers.utils.formatUnits(meadPrice2, 6));
-    }
+    //     console.log("Mead Supply ONCHAIN", meadSupplyOnChain);
+    //     console.log("FDV ONCHAIN", FDVOnChain);
+    //     console.log("USDV RESERVES ONCHAIN", usdcReserves);
+    //     console.log("LP Ratio", lpRatio);
+    //     console.log("LP Discount", ethers.utils.formatUnits(lpDiscount, 2));
+    //     console.log("USDC Reserves", ethers.utils.formatUnits(usdcReserves, 6))
+    //     console.log("Price in USDC of 1 LP token", ethers.utils.formatUnits(LPPrice, 6));
+    //     console.log("LP value of 500k USDC", ethers.utils.formatUnits(lpTokensFor500k, 18));
+    //     console.log("Mead value of 1 USDC", ethers.utils.formatUnits(meadForUsdc, 18));
+    //     console.log("Mead Price", ethers.utils.formatUnits(meadPrice, 6));
+    //     console.log("Mead Price", ethers.utils.formatUnits(meadPrice2, 6));
+    // }
 }
 
 main()
