@@ -3,8 +3,8 @@ import { renovation_address } from "../NFT_ADDRESSES";
 
 async function main() {
   const factory = await ethers.getContractFactory("Renovation");
-  await upgrades.upgradeProxy(renovation_address, factory);
-  console.log("Upgraded renovation!");
+  let newContract = await upgrades.upgradeProxy(renovation_address, factory);
+  console.log("Upgraded renovation!", newContract.address);
 }
 
 main()

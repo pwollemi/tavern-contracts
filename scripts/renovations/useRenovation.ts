@@ -5,7 +5,7 @@ import hre, { ethers } from "hardhat";
 import { deployContract, deployProxy } from "../../helper/deployer";
 
 import ERC20 from '../../abis/ERC20.json';
-import { sleep } from "../../helper/utils";
+import { impersonateAccount, sleep } from "../../helper/utils";
 import { TRADERJOE_ROUTER_MAINNET, USDC_MAINNET, XMEAD_MAINNET, XMEAD_TESTNET } from "../ADDRESSES";
 import { Brewery_address, renovation_address, settings_address } from "../NFT_ADDRESSES";
 
@@ -13,17 +13,12 @@ async function main() {
     // The signers
     const [deployer] = await ethers.getSigners();
 
+    const holderAddress = "0xc198CAe628C26076Cf94D1bfDf67E021D908646D";
+    await impersonateAccount(holderAddress);
+    const holder = await ethers.getSigner(holderAddress);
+
     const Brewery = await ethers.getContractAt("Brewery", Brewery_address);
-    const Renovation = await ethers.getContractAt("Renovation", renovation_address);
-
-    // 3 is a type change, 4 is the magic type
-
-    const renovationType = 3;
-    const breweryType = 7;
-    //await Renovation.create(deployer.address, renovationType, breweryType, "");
-    console.log("Created a renovation!")
-
-    await Brewery.upgrade("1", "1");
+    await Brewery.connect(holder).upgrade("4036", "3");
     console.log("Upgraded");
 }
 

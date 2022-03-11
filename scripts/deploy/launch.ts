@@ -37,6 +37,7 @@ async function main() {
     await mead.setWhitelist(pair, false);
     console.log("Set whitelist for router and pair");
 
+    // Launch liquidity pool
     await router.addLiquidity(
         Mead_address,
         USDC_MAINNET,
@@ -68,7 +69,6 @@ async function main() {
     // );
     // console.log("Bought tokens!");
 
-    // Launch liquidity pool
     // Enable trading for MEAD
 
 }

@@ -36,7 +36,7 @@ contract RenovationPurchaseHelper is Initializable, OwnableUpgradeable {
     }
 
     /// @notice The mapping of item IDs to their data
-    mapping (uint256 => Item) items;
+    mapping (uint256 => Item) public items;
 
     /// @notice How many items are in items
     uint256 public totalItems;
@@ -54,7 +54,6 @@ contract RenovationPurchaseHelper is Initializable, OwnableUpgradeable {
      * @notice Adds an item to the store to be purchased
      */
     function addItem(uint256 price, uint256 supply, uint256 renovationType, uint256 intValue, string memory strValue) external onlyOwner {
-        bytes32 id = keccak256(abi.encodePacked(renovationType, intValue, strValue));
         items[totalItems] = Item({
             price: price,
             supply: supply,
@@ -75,11 +74,10 @@ contract RenovationPurchaseHelper is Initializable, OwnableUpgradeable {
      * @notice Purchases a BREWERY using MEAD
      */
     function purchaseWithXMead(address account, uint256 id) external {
+        require(id <= totalItems, "This ID doesnt exist");
         require(items[id].supply > 0, "There are no items left");
 
         XMead(settings.xmead()).redeem(msg.sender, items[id].price);
-        IERC20Upgradeable(settings.mead()).safeTransferFrom(settings.redeemPool(), settings.tavernsKeep(), items[id].price * settings.treasuryFee() / settings.PRECISION());
-        IERC20Upgradeable(settings.mead()).safeTransferFrom(settings.redeemPool(), settings.rewardsPool(), items[id].price * settings.rewardPoolFee() / settings.PRECISION());
 
         // Mint logic
         renovation.create(account, items[id].renovationType, items[id].intValue, items[id].strValue);
@@ -91,6 +89,7 @@ contract RenovationPurchaseHelper is Initializable, OwnableUpgradeable {
      * @notice Purchases a BREWERY using MEAD
      */
     function purchaseWithMead(address account, uint256 id) external {
+        require(id <= totalItems, "This ID doesnt exist");
         require(items[id].supply > 0, "There are no items left");
 
         IERC20Upgradeable(settings.mead()).safeTransferFrom(msg.sender, settings.tavernsKeep(), items[id].price * settings.treasuryFee() / settings.PRECISION());

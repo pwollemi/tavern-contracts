@@ -94,13 +94,11 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
 
         uint256 xMeadAmount = settings.xMeadCost();
         XMead(settings.xmead()).redeem(msg.sender, xMeadAmount);
-        IERC20Upgradeable(settings.mead()).safeTransferFrom(settings.redeemPool(), settings.tavernsKeep(), xMeadAmount * settings.treasuryFee() / settings.PRECISION());
-        IERC20Upgradeable(settings.mead()).safeTransferFrom(settings.redeemPool(), settings.rewardsPool(), xMeadAmount * settings.rewardPoolFee() / settings.PRECISION());
 
         // Mint logic
         _mint(msg.sender, name, settings.reputationForMead());
     }
-    
+
     /**
      * @notice Purchases a BREWERY using MEAD
      */

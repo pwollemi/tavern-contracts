@@ -1,5 +1,5 @@
 import { ethers } from "hardhat";
-import { settings_address } from "./NFT_ADDRESSES";
+import { settings_address } from "../NFT_ADDRESSES";
 
 async function main() {
     // The signers
@@ -11,11 +11,12 @@ async function main() {
     console.log("\tUSDC", await settings.usdc());
     console.log("\tTreasury", await settings.tavernsKeep());
     console.log("\tReward Pool", await settings.rewardsPool());
-    console.log("\tredeemer", await settings.redeemer());
-    console.log("\trenovationAddress", await settings.renovationAddress());
-    console.log("\tclassManager", await settings.classManager());
-    console.log("\tdexRouter", await settings.dexRouter());
-    console.log("\tliquidityPair", await settings.liquidityPair());
+    console.log("\tRedeem Pool", await settings.redeemPool());
+    console.log("\tXMead Redeemer", await settings.redeemer());
+    console.log("\tRenovation Address", await settings.renovationAddress());
+    console.log("\tClass Manager", await settings.classManager());
+    console.log("\tTrader Joe Router", await settings.dexRouter());
+    console.log("\tLiquidity Pair", await settings.liquidityPair());
 
     console.log("\n\n=== Settings ===")
     console.log("\ttreasuryFee", await settings.treasuryFee());

@@ -1,0 +1,17 @@
+import { ethers } from "hardhat";
+import { settings_address } from "../NFT_ADDRESSES";
+
+async function main() {
+    // The signers
+    const [deployer] = await ethers.getSigners();
+    const settings = await ethers.getContractAt("TavernSettings", settings_address);
+    await settings.setRedeemPool(deployer.address);
+    await settings.setRedeemer('0x2f54fc9EF1B3a0259cC8DC5B1047edC2670F460E');
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+});

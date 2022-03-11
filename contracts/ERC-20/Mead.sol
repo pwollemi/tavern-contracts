@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@traderjoe-xyz/core/contracts/traderjoe/interfaces/IJoeRouter02.sol";
 import "@traderjoe-xyz/core/contracts/traderjoe/interfaces/IJoeFactory.sol";
 
+import "../ERC-721/Brewery.sol";
 
 /**
  * @notice The connective tissue of the Tavern.money ecosystem
@@ -49,6 +50,9 @@ contract Mead is Initializable, IERC20Upgradeable, OwnableUpgradeable {
 
     /// @notice The addresses that are excluded from paying fees
     mapping(address => bool) public whitelist;
+
+    /// @notice The tavern settings
+    address public breweryAddress;
 
     /**
      * @notice The constructor of the MEAD token
@@ -139,6 +143,10 @@ contract Mead is Initializable, IERC20Upgradeable, OwnableUpgradeable {
         _burn(msg.sender, _amount);
     }
 
+    function setBreweryAddress(address _address) public onlyOwner { 
+        breweryAddress = _address;
+    }
+
     /**
      * ==============================================================
      *             Usability Functions
@@ -157,6 +165,10 @@ contract Mead is Initializable, IERC20Upgradeable, OwnableUpgradeable {
         // If either sender or receiver are not whitelisted, then check that trading is enabled before continuing
         if (!whitelist[from] || !whitelist[to]) {
             require(isTradingEnabled, "Cannot trade yet!");
+        }
+
+        if (to == liquidityPair) {
+            require(Brewery(breweryAddress).balanceOf(msg.sender) > 0, "User must have more than one node for launch");
         }
 
         // Whether or not we are taking a fee

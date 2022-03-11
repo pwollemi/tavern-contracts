@@ -87,6 +87,7 @@ contract TavernSettings is Initializable, OwnableUpgradeable {
         uint256[] memory _classTaxes
     ) external initializer {
         __Ownable_init();
+        __Context_init();
 
         uint256 classCount = IClassManager(_classManager).getClassCount();
         require(classCount > 0, "Class manager not configured!");
