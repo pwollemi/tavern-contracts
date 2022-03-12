@@ -4,7 +4,7 @@ import { deployContract, deployProxy } from "../../helper/deployer";
 import ERC20 from '../../abis/ERC20.json';
 import { sleep } from "../../helper/utils";
 import { PRESALE_MAINNET, USDC_MAINNET, XMEAD_MAINNET, XMEAD_TESTNET } from "../ADDRESSES";
-import { Mead_address } from "../NFT_ADDRESSES";
+import { Brewery_address, Mead_address } from "../NFT_ADDRESSES";
 
 async function main() {
     // The signers
@@ -13,8 +13,8 @@ async function main() {
     const MeadContract = await ethers.getContractAt("Mead", Mead_address);
     console.log("owner", await MeadContract.owner());
     
-    const mead = await ethers.getContractFactory("Mead");
-    await upgrades.upgradeProxy(Mead_address, mead);
+    const meadFactory = await ethers.getContractFactory("Mead");
+    await upgrades.upgradeProxy(Mead_address, meadFactory);
 
 }
 

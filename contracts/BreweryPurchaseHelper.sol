@@ -93,6 +93,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
      * @notice Purchases a BREWERY using MEAD
      */
     function purchaseWithXMead(uint256 amount) external {
+        require(amount > 0, "Amount must be above zero");
         require(amount <= settings.txLimit(), "Cant go above tx limit!");
 
         uint256 xMeadAmount = amount * settings.xMeadCost();
@@ -108,6 +109,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
      * @notice Purchases a BREWERY using MEAD
      */
     function purchaseWithMead(uint256 amount) external {
+        require(amount > 0, "Amount must be above zero");
         require(amount <= settings.txLimit(), "Cant go above tx limit!");
 
         uint256 meadAmount = amount * settings.breweryCost();
@@ -124,6 +126,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
      * @notice Purchases a BREWERY using USDC
      */
     function purchaseWithUSDC(uint256 amount) external {
+        require(amount > 0, "Amount must be above zero");
         require(amount <= settings.txLimit(), "Cant go above tx limit!");
         require(isUSDCEnabled, "USDC discount off");
 
@@ -141,6 +144,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
      * @notice Purchases a BREWERY using LP tokens
      */
     function purchaseWithLP(uint256 amount) external {
+        require(amount > 0, "Amount must be above zero");
         require(amount <= settings.txLimit(), "Cant go above tx limit!");
         require(isLPEnabled, "LP discount off");
 

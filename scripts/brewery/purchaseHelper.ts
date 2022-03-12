@@ -4,25 +4,38 @@ import { deployContract, deployProxy } from "../../helper/deployer";
 import ERC20 from '../../abis/ERC20.json';
 import { impersonateAccount, sleep } from "../../helper/utils";
 import { TRADERJOE_ROUTER_MAINNET, USDC_MAINNET, XMEAD_MAINNET, XMEAD_TESTNET } from "../ADDRESSES";
-import { BreweryHelper_address, Brewery_address, Mead_address, renovation_address, settings_address, xMead_address } from "../NFT_ADDRESSES";
+import { BreweryHelper_address, Brewery_address, ClassManager_address, Mead_address, renovation_address, settings_address, xMead_address } from "../NFT_ADDRESSES";
 
 async function main() {
     // The signers
     const [deployer] = await ethers.getSigners();
 
-    const holderAddress = '0xc198CAe628C26076Cf94D1bfDf67E021D908646D'
-    await impersonateAccount(holderAddress);
-    const signedHolder = await ethers.getSigner(holderAddress);
-
     const brewery = await ethers.getContractAt("Brewery", Brewery_address);
     const xMead = await ethers.getContractAt("XMead", xMead_address);
     const mead = await ethers.getContractAt("Mead", Mead_address);
     const usdc = await ethers.getContractAt(ERC20, USDC_MAINNET);
+    const classManager = await ethers.getContractAt("ClassManager", ClassManager_address);
     const BreweryHelper = await ethers.getContractAt("BreweryPurchaseHelper", BreweryHelper_address);
 
-    await BreweryHelper.setLPEnabled(true);
-    await BreweryHelper.setUSDCEnabled(true);
-    return;
+    
+    //  *  - Helper needs to be the owner of Brewery
+    //await brewery.grantRole(await brewery.MINTER_ROLE(), BreweryHelper.address);
+
+    //     *  - Helper should be able to burn xMEAD
+    // let tx = await xMead.grantRole(await xMead.REDEEMER_ROLE(), BreweryHelper.address);
+    // await tx.wait();
+
+    // //     *  - Helper should be able to award reputation
+    // tx = await classManager.grantRole(await classManager.MANAGER_ROLE(), BreweryHelper.address);
+    // await tx.wait();
+
+    //await BreweryHelper.setLPEnabled(true);
+
+    //return;
+
+    // await BreweryHelper.setLPEnabled(true);
+    // await BreweryHelper.setUSDCEnabled(true);
+    // return;
     //await BreweryHelper.connect(signedHolder).purchaseWithXMead("");
 
     const settings = await ethers.getContractAt("TavernSettings", settings_address);
@@ -59,7 +72,7 @@ async function main() {
         console.log("Brewery Price (in USD)", ethers.utils.formatUnits(breweryPrice, 6));
         console.log("Brewery price (in LP)", ethers.utils.formatUnits(breweryPriceInLp, await pair.decimals()))
     }
-   
+    return;
     // await mead.enableTrading();
     // console.log("Enabled trading!");
 
@@ -72,14 +85,14 @@ async function main() {
 
     await usdc.approve(router.address, ethers.constants.MaxUint256);
     await mead.approve(router.address, ethers.constants.MaxUint256);
-    await router.swapExactTokensForTokens(
-        ethers.utils.parseUnits("1000000", 6),
-        0, 
-        [USDC_MAINNET, Mead_address], 
-        deployer.address, 
-        Math.round(Date.now()/1000) + 360
-    );
-    console.log("Bought tokens!");
+    // await router.swapExactTokensForTokens(
+    //     ethers.utils.parseUnits("1000000", 6),
+    //     0, 
+    //     [USDC_MAINNET, Mead_address], 
+    //     deployer.address, 
+    //     Math.round(Date.now()/1000) + 360
+    // );
+    // console.log("Bought tokens!");
 
     meadBalance = await mead.balanceOf(deployer.address);
     usdcBalance = await usdc.balanceOf(deployer.address);
