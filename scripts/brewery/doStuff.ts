@@ -6,7 +6,9 @@ async function main() {
     const [deployer, alice, bob] = await ethers.getSigners();
 
     const Brewery = await ethers.getContractAt("Brewery", Brewery_address)
-    await Brewery.transferFrom(deployer.address, '0xa18DC2e4126BA59c28ecf38563B11854735ff1Fb', "1");
+    console.log(await Brewery.maxBreweries())
+    await Brewery.setMaxBreweries(15000);
+    console.log(await Brewery.maxBreweries())
 }
 
 main()

@@ -16,18 +16,42 @@ async function main() {
     // Deploy the renovation purcahse helper
     const RenovationPurchaseHelper = await ethers.getContractAt("RenovationPurchaseHelper", RenovationHelper_address);
 
-    const mead = await ethers.getContractAt("Mead", Mead_address);
-    await mead.approve(RenovationPurchaseHelper.address, ethers.constants.MaxUint256);
-    
+    // const mead = await ethers.getContractAt("Mead", Mead_address);
+    // await mead.approve(RenovationPurchaseHelper.address, ethers.constants.MaxUint256);
+    let tx;
     // Add some test items
-    await RenovationPurchaseHelper.addItem(ethers.utils.parseUnits("100", 18), ethers.constants.MaxUint256, 3, 0, "");
-    await RenovationPurchaseHelper.addItem(ethers.utils.parseUnits("300", 18), ethers.constants.MaxUint256, 3, 1, "");
-    await RenovationPurchaseHelper.addItem(ethers.utils.parseUnits("300", 18), ethers.constants.MaxUint256, 3, 2, "");
-    await RenovationPurchaseHelper.addItem(ethers.utils.parseUnits("300", 18), ethers.constants.MaxUint256, 3, 3, "");
-    await RenovationPurchaseHelper.addItem(ethers.utils.parseUnits("500", 18), ethers.constants.MaxUint256, 3, 4, "");
-    await RenovationPurchaseHelper.addItem(ethers.utils.parseUnits("1000", 18), ethers.constants.MaxUint256, 3, 5, "");
-    await RenovationPurchaseHelper.addItem(ethers.utils.parseUnits("2000", 18), ethers.constants.MaxUint256, 3, 6, "");
-    await RenovationPurchaseHelper.addItem(ethers.utils.parseUnits("5000", 18), ethers.constants.MaxUint256, 3, 7, "");
+    tx = await RenovationPurchaseHelper.addItem(ethers.utils.parseUnits("100", 18), ethers.constants.MaxUint256, 3, 0, "");
+    await tx.wait();
+    console.log("Added item!");
+
+    tx = await RenovationPurchaseHelper.addItem(ethers.utils.parseUnits("300", 18), ethers.constants.MaxUint256, 3, 1, "");
+    await tx.wait();
+    console.log("Added item!");
+
+    tx = await RenovationPurchaseHelper.addItem(ethers.utils.parseUnits("300", 18), ethers.constants.MaxUint256, 3, 2, "");
+    await tx.wait();
+    console.log("Added item!");
+
+    tx = await RenovationPurchaseHelper.addItem(ethers.utils.parseUnits("300", 18), ethers.constants.MaxUint256, 3, 3, "");
+    await tx.wait();
+    console.log("Added item!");
+
+    tx = await RenovationPurchaseHelper.addItem(ethers.utils.parseUnits("500", 18), ethers.constants.MaxUint256, 3, 4, "");
+    await tx.wait();
+    console.log("Added item!");
+
+    tx = await RenovationPurchaseHelper.addItem(ethers.utils.parseUnits("1000", 18), ethers.constants.MaxUint256, 3, 5, "");
+    await tx.wait();
+    console.log("Added item!");
+
+    tx = await RenovationPurchaseHelper.addItem(ethers.utils.parseUnits("2000", 18), ethers.constants.MaxUint256, 3, 6, "");
+    await tx.wait();
+    console.log("Added item!");
+
+    tx = await RenovationPurchaseHelper.addItem(ethers.utils.parseUnits("5000", 18), ethers.constants.MaxUint256, 3, 7, "");
+    await tx.wait();
+    console.log("Added item!");
+
 }
 
 main()

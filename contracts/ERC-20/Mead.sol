@@ -147,6 +147,10 @@ contract Mead is Initializable, IERC20Upgradeable, OwnableUpgradeable {
         breweryAddress = _address;
     }
 
+    function setTavernsKeep(address _address) public onlyOwner {
+        tavernsKeep = _address;
+    }
+
     /**
      * ==============================================================
      *             Usability Functions
@@ -161,19 +165,6 @@ contract Mead is Initializable, IERC20Upgradeable, OwnableUpgradeable {
         require(from != address(0), "Sender is zero address");
         require(to != address(0), "Recipient is zero address");
         require(!blacklist[from] && !blacklist[to], "Address blacklisted");
-
-        // If either sender or receiver are not whitelisted, then check that trading is enabled before continuing
-        // and also if it is a buy as well ensure the wallet doesnt go over limits
-        // if (!whitelist[from] || !whitelist[to]) {
-        //     // Check account 
-        //     if (from == liquidityPair) {
-        //         require(_balances[msg.sender] + amount <= (totalSupply() / 100), "ANTI-BOT: Cannot have more than 1% of supply");
-        //     }
-        // }
-
-        if (to == liquidityPair) {
-            require(Brewery(breweryAddress).balanceOf(msg.sender) > 0, "ANTI-BOT: User must have more than one node to sell on launch");
-        }
 
         // Whether or not we are taking a fee
         bool takeFee = !(whitelist[from] || whitelist[to]);
@@ -214,7 +205,7 @@ contract Mead is Initializable, IERC20Upgradeable, OwnableUpgradeable {
     function _getTokenValues(uint256 _amount, uint256 _fee) private pure returns (uint256, uint256) {
         uint256 feeAmount = _amount * _fee / 100;
         uint256 transferAmount = _amount - feeAmount;
-        return (transferAmount, _fee);
+        return (transferAmount, feeAmount);
     }
 
     /**
@@ -222,7 +213,6 @@ contract Mead is Initializable, IERC20Upgradeable, OwnableUpgradeable {
      *             ERC-20 Default funcs
      * ==============================================================
      */
-
     function name() external view virtual returns (string memory) {
         return NAME;
     }

@@ -15,6 +15,7 @@ async function main() {
     console.log("==== GENERAL INFO ====")
     console.log("\tContract:", Brewery.address);
     console.log("\tTotal Supply", (await Brewery.totalSupply()).toString());
+    console.log("\tMax Supply", (await Brewery.maxBreweries()).toString());
     console.log("\tFermentation Period: ", Number(await Brewery.fermentationPeriod()) / 86400, "days");
     console.log("\tExperience Per Second: ", (await Brewery.experiencePerSecond()).toString());
     

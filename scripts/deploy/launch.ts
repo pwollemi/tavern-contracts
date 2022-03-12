@@ -8,6 +8,8 @@ async function main() {
     // The signers
     const [deployer] = await ethers.getSigners();
 
+    let tx;
+
     console.log("Deployer Address", deployer.address);
     console.log("AVAX", ethers.utils.formatEther(await deployer.getBalance()));
     const mead = await ethers.getContractAt("Mead", Mead_address);
@@ -18,19 +20,23 @@ async function main() {
     const redeemer = await ethers.getContractAt("xMeadRedeemHelper", RedeemHelper_address)
     const usdc = await ethers.getContractAt(ERC20, USDC_MAINNET)
 
+    tx = await mead.setSellTax(0);
+    await tx.wait();
+    console.log("Set tax to zero");
+
     const meadBalance = await mead.balanceOf(deployer.address);
     const usdcBalance = await usdc.balanceOf(deployer.address);
     console.log("Mead", ethers.utils.formatUnits(meadBalance, 18));
     console.log("USDC", ethers.utils.formatUnits(usdcBalance, 6));
 
-    await router.swapExactAVAXForTokens(
-        0, 
-        ['0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7', USDC_MAINNET], 
-        deployer.address, 
-        Math.round(Date.now()/1000) + 360, 
-        { value: ethers.utils.parseEther("100000")}
-    );
-    console.log("Bought tokens!");
+    // await router.swapExactAVAXForTokens(
+    //     0, 
+    //     ['0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7', USDC_MAINNET], 
+    //     deployer.address, 
+    //     Math.round(Date.now()/1000) + 360, 
+    //     { value: ethers.utils.parseEther("100000")}
+    // );
+    // console.log("Bought tokens!");
 
     const pair = await factory.getPair(Mead_address, USDC_MAINNET);
 
