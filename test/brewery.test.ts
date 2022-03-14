@@ -89,6 +89,8 @@ describe('Brewery', () => {
     await brewery.addTier(tiers[0], yields[0]);
     await brewery.addTier(tiers[1], yields[1]);
     await brewery.addTier(tiers[2], yields[2]);
+
+    await brewery.setMaxBreweries(100);
   });
 
   describe("mint", async () => {
@@ -146,7 +148,7 @@ describe('Brewery', () => {
     // XP: 200
     await brewery.addXP(1, 100);
     expect(await brewery.getTier(1)).to.be.equal(1);
-    
+
     // XP: 250
     await brewery.addXP(1, 50);
     expect(await brewery.getTier(1)).to.be.equal(2);
@@ -154,7 +156,7 @@ describe('Brewery', () => {
 
   it("XP earning", async () => {
     const lastTime = await getLatestBlockTimestamp();
-    const startTime = lastTime + 86400*10;
+    const startTime = lastTime + 86400 * 10;
     await brewery.setStartTime(startTime);
     await brewery.connect(minter).mint(alice.address, "test");
 
@@ -188,7 +190,7 @@ describe('Brewery', () => {
 
   it("Pending Mead", async () => {
     const lastTime = await getLatestBlockTimestamp();
-    const startTime = lastTime + 86400*10;
+    const startTime = lastTime + 86400 * 10;
     await brewery.setStartTime(startTime);
     await brewery.connect(minter).mint(alice.address, "test");
     const mintTime = await getLatestBlockTimestamp();
