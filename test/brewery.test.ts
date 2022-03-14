@@ -82,12 +82,15 @@ describe('Brewery', () => {
     renovation = <Renovation>await deployProxy("Renovation", brewery.address);
 
     await brewery.grantRole(await brewery.MINTER_ROLE(), minter.address);
+    await classManager.grantRole(await classManager.MANAGER_ROLE(), brewery.address);
 
     await mead.connect(rewardsPool).approve(brewery.address, ethers.constants.MaxUint256);
 
     await brewery.addTier(tiers[0], yields[0]);
     await brewery.addTier(tiers[1], yields[1]);
     await brewery.addTier(tiers[2], yields[2]);
+
+    await brewery.setMaxBreweries(100);
   });
 
   describe("mint", async () => {
@@ -145,7 +148,7 @@ describe('Brewery', () => {
     // XP: 200
     await brewery.addXP(1, 100);
     expect(await brewery.getTier(1)).to.be.equal(1);
-    
+
     // XP: 250
     await brewery.addXP(1, 50);
     expect(await brewery.getTier(1)).to.be.equal(2);
@@ -153,7 +156,7 @@ describe('Brewery', () => {
 
   it("XP earning", async () => {
     const lastTime = await getLatestBlockTimestamp();
-    const startTime = lastTime + 86400*10;
+    const startTime = lastTime + 86400 * 10;
     await brewery.setStartTime(startTime);
     await brewery.connect(minter).mint(alice.address, "test");
 
@@ -187,7 +190,7 @@ describe('Brewery', () => {
 
   it("Pending Mead", async () => {
     const lastTime = await getLatestBlockTimestamp();
-    const startTime = lastTime + 86400*10;
+    const startTime = lastTime + 86400 * 10;
     await brewery.setStartTime(startTime);
     await brewery.connect(minter).mint(alice.address, "test");
     const mintTime = await getLatestBlockTimestamp();
@@ -291,6 +294,52 @@ describe('Brewery', () => {
       const xp1 = (await brewery.breweryStats(1)).xp;
 
       expect(xp1.sub(xp0)).to.be.equal(newXP);
+    });
+  });
+
+  describe("compound", async () => {
+    it("compound several items with one nft reward", async () => {
+      const count = 3;
+
+      await brewery.connect(minter).mint(alice.address, "test");
+      const lastClaimed = await getLatestBlockTimestamp();
+      const rewardPeriod = baseFermentationPeriod * 100;
+      const totalMeads = yields[0].div(86400).mul(rewardPeriod);
+      const totalCost = (await settings.breweryCost()).mul(count);
+      const treasuryCut = totalCost.mul(await settings.treasuryFee()).div(1e4);
+      const userClaimAmount = totalMeads.sub(totalCost);
+      const claimTax = userClaimAmount.mul(taxRates[0]).div(10000);
+      const userReward = userClaimAmount.sub(claimTax);
+
+      await setNextBlockTimestamp(lastClaimed + rewardPeriod);
+
+      const aliceMead0 = await mead.balanceOf(alice.address);
+      const treasuryMead0 = await mead.balanceOf(tavernsKeep.address);
+      const breweryCount0 = await brewery.balanceOf(alice.address);
+      await brewery.connect(alice).compound(count);
+      const aliceMead1 = await mead.balanceOf(alice.address);
+      const treasuryMead1 = await mead.balanceOf(tavernsKeep.address);
+      const breweryCount1 = await brewery.balanceOf(alice.address);
+
+      expect(breweryCount1.sub(breweryCount0)).to.be.equal(count);
+      expect(aliceMead1.sub(aliceMead0)).to.be.equal(userReward);
+      expect(treasuryMead1.sub(treasuryMead0)).to.be.equal(claimTax.add(treasuryCut));
+    });
+
+    it("compound all", async () => {
+      await brewery.connect(minter).mint(alice.address, "test");
+      const lastClaimed = await getLatestBlockTimestamp();
+      const rewardPeriod = baseFermentationPeriod * 10;
+      const totalMeads = yields[0].div(86400).mul(rewardPeriod);
+      const count = totalMeads.div(await settings.breweryCost());
+
+      await setNextBlockTimestamp(lastClaimed + rewardPeriod);
+
+      const breweryCount0 = await brewery.balanceOf(alice.address);
+      await brewery.connect(alice).compoundAll();
+      const breweryCount1 = await brewery.balanceOf(alice.address);
+
+      expect(breweryCount1.sub(breweryCount0)).to.be.equal(count);
     });
   });
 
