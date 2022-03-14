@@ -164,24 +164,25 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
     /**
      * @notice Purchases a BREWERY using USDC and automatically converting into LP tokens 
      */
-    function purchaseWithLPUsingZap(string memory name) external {
+    function purchaseWithLPUsingZap(uint256 _amount) external {
         uint256 discount = calculateLPDiscount();
-        uint256 discountMultiplier = (settings.PRECISION() - discount) / settings.PRECISION();
-        uint256 zapFeeMultiplier = (settings.PRECISION() + zapFee) / settings.PRECISION();
 
         // Get the price of a brewery as if it were valued at the LP tokens rate + a fee for automatically zapping for you
         // Bear in mind this will still be discounted even though we take an extra fee!
-        uint256 breweryPriceInUSDCWithLPDiscount = getUSDCForMead(settings.breweryCost()) * discountMultiplier * zapFeeMultiplier;
+        uint256 breweryCost = _amount * getUSDCForMead(settings.breweryCost());
+        uint256 breweryCostWithLPDiscount = breweryCost - breweryCost * (discount - zapFee) / 1e4;
 
         /// @notice Handles the zapping of liquitity for us + an extra fee
         /// @dev The LP tokens will now be in the hands of the msg.sender
-        uint256 liquidityTokens = zapLiquidity(breweryPriceInUSDCWithLPDiscount * (settings.PRECISION() + zapFee) / (settings.PRECISION()));
+        uint256 liquidityTokens = zapLiquidity(breweryCostWithLPDiscount);
 
         // Send the tokens from the account transacting this function to the taverns keep
         settings.liquidityPair().transferFrom(msg.sender, settings.tavernsKeep(), liquidityTokens);
 
         // Mint logic
-        _mint(msg.sender, name, settings.reputationForLP());
+        for(uint256 i = 0; i < _amount; ++i) {
+            _mint(msg.sender, "", settings.reputationForLP());
+        }
     }
 
     /**
@@ -190,37 +191,37 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
      * @return The liquidity token balance
      */
     function zapLiquidity(uint256 usdcAmount) public returns (uint256) {
-        uint256 half = usdcAmount / 2;
 
         address[] memory path = new address[](2);
-        path[0] = settings.mead();
-        path[1] = settings.usdc();
+        path[0] = settings.usdc();
+        path[1] = settings.mead();
 
         // Swap any USDC to receive 50 MEAD
+        IERC20Upgradeable(settings.usdc()).safeTransferFrom(msg.sender, address(this), usdcAmount);
+        IERC20Upgradeable(settings.usdc()).approve(address(settings.dexRouter()), usdcAmount);
         uint[] memory amounts = settings.dexRouter().swapExactTokensForTokens(
-            half, 
+            usdcAmount / 2, 
             0, 
             path,
-            msg.sender,
+            address(this),
             block.timestamp + 120
         );
 
-        // Transfer the tokens into the contract
-        IERC20Upgradeable(settings.mead()).safeTransferFrom(msg.sender, address(this), amounts[0]);
-        IERC20Upgradeable(settings.usdc()).safeTransferFrom(msg.sender, address(this), amounts[1]);
-
         // Approve the router to spend these tokens 
-        IERC20Upgradeable(settings.mead()).approve(address(settings.dexRouter()), amounts[0]);
-        IERC20Upgradeable(settings.usdc()).approve(address(settings.dexRouter()), amounts[1]);
+        IERC20Upgradeable(settings.usdc()).approve(address(settings.dexRouter()), amounts[0]);
+        IERC20Upgradeable(settings.mead()).approve(address(settings.dexRouter()), amounts[1]);
+
+        uint256 amount0Min = amounts[0] - amounts[0] * zapSlippage / 1e4;
+        uint256 amount1Min = amounts[1] - amounts[1] * zapSlippage / 1e4;
 
         // Add liquidity (MEAD + USDC) to receive LP tokens
         (, , uint liquidity) = settings.dexRouter().addLiquidity(
-            address(settings.mead()),
-            address(settings.usdc()),
+            settings.usdc(),
+            settings.mead(),
             amounts[0],
             amounts[1],
-            amounts[0] * (settings.PRECISION() - zapSlippage) / settings.PRECISION(),
-            amounts[1] * (settings.PRECISION() - zapSlippage) / settings.PRECISION(),
+            0,
+            0,
             msg.sender,
             block.timestamp + 120
         );
