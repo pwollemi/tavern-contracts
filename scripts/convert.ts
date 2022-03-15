@@ -15,7 +15,7 @@ async function main() {
 
     const ClassManager = await ethers.getContractAt("ClassManager", ClassManager_address)
 
-    await ClassManager.grantRole(await ClassManager.MANAGER_ROLE(), deployer.address);
+    //await ClassManager.grantRole(await ClassManager.MANAGER_ROLE(), deployer.address);
 
     let txCount = await deployer.getTransactionCount();
     for (const [key, value] of Object.entries(reputation)) {

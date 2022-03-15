@@ -89,6 +89,14 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         ClassManager(settings.classManager()).addReputation(msg.sender, reputation);
     }
 
+    // function _mintWithSkin(address account, string memory name, uint256 reputation, uint256 skinId) internal {
+        
+    //     renovation.create(account, items[id].renovationType, items[id].intValue, items[id].strValue);
+
+    //     brewery.mint(account, name);
+    //     ClassManager(settings.classManager()).addReputation(msg.sender, reputation);
+    // }
+
     /**
      * @notice Purchases a BREWERY using MEAD
      */
