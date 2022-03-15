@@ -33,12 +33,14 @@ describe("TavernStaking", function () {
 	beforeEach(async function () {
 		this.mead = <Mead>await deployProxy("Mead", routerAddress, USDC.address, this.minter.address, initialSupply);
 		await this.mead.deployed()
+
+		this.lp = await this.ERC20Mock.deploy("LPToken", "LP", "10000000000")
 	})
 
 	it("should set correct state variables", async function () {
-		this.chef = <TavernStaking>await deployProxy("TavernStaking", this.mead.address, "1000", "0", "1000", "2000")
+		this.chef = <TavernStaking>await deployProxy("TavernStaking",
+			this.mead.address, this.lp.address, "1000", "0", "1000", "2000")
 		await this.chef.deployed()
-		await this.mead.transferOwnership(this.chef.address)
 		const mead = await this.chef.mead()
 		expect(mead).to.equal(this.mead.address)
 	})
@@ -49,30 +51,25 @@ describe("TavernStaking", function () {
 			await this.lp.transfer(this.alice.address, "1000")
 			await this.lp.transfer(this.bob.address, "1000")
 			await this.lp.transfer(this.carol.address, "1000")
-
-			this.lp2 = await this.ERC20Mock.deploy("LPToken2", "LP2", "10000000000")
-			await this.lp2.transfer(this.alice.address, "1000")
-			await this.lp2.transfer(this.bob.address, "1000")
-			await this.lp2.transfer(this.carol.address, "1000")
 		})
 
 		it("should set correct pool info", async function () {
-			this.chef = <TavernStaking>await deployProxy("TavernStaking", this.mead.address, "100", "100", "1000", "2000")
+			this.chef = <TavernStaking>await deployProxy("TavernStaking",
+				this.mead.address,
+				this.lp.address,
+				"100", "100", "1000", "2000");
 			await this.chef.deployed()
 
-			await expect(this.chef.setPoolInfo(this.lp.address, true))
-				.to.be.revertedWith('function call to a non-contract account');
-
-			await this.chef.setPoolInfo(this.lp.address, false);
 			const poolInfo = await this.chef.poolInfo();
 			expect(poolInfo.lpToken).to.equal(this.lp.address);
 		})
 
 		it("should allow emergency withdraw", async function () {
 			// 100 per block farming rate starting at block 100 with bonus until block 1000
-			this.chef = <TavernStaking>await deployProxy("TavernStaking", this.mead.address, "100", "100", "1000", "2000")
+			this.chef = <TavernStaking>await deployProxy("TavernStaking",
+				this.mead.address, this.lp.address,
+				"100", "100", "1000", "2000")
 			await this.chef.deployed()
-			await this.chef.setPoolInfo(this.lp.address, false)
 
 			await this.lp.connect(this.bob).approve(this.chef.address, "1000")
 			await this.chef.connect(this.bob).deposit("100")
@@ -87,61 +84,71 @@ describe("TavernStaking", function () {
 			const startBlock = await ethers.provider.getBlockNumber() + 100;
 			this.chef = <TavernStaking>await deployProxy("TavernStaking",
 				this.mead.address,
+				this.lp.address,
 				100,	// rewardPerBlock
 				startBlock,	// startBlock
 				startBlock + 100,	// firstBonusBlock
 				startBlock + 200	// secondBonusBlock
 			);
 			await this.chef.deployed()
-			await this.chef.setPoolInfo(this.lp.address, false)
 			await this.mead.transfer(this.chef.address, 1000000000);
 
 			await this.lp.connect(this.bob).approve(this.chef.address, "1000")
 			await this.chef.connect(this.bob).deposit("100")
-			await advanceBlockTo(startBlock - 11)
 
 			// Checking first bonus multiplier
+			await advanceBlockTo(startBlock - 11)
 			await this.chef.connect(this.bob).deposit("0") // block 90
-			expect(await this.mead.balanceOf(this.bob.address)).to.equal("0")
+			expect(await this.chef.pendingRewards(this.bob.address)).to.equal("0")
+
 			await advanceBlockTo(startBlock - 6)
-
 			await this.chef.connect(this.bob).deposit("0") // block 95
-			expect(await this.mead.balanceOf(this.bob.address)).to.equal("0")
+			expect(await this.chef.pendingRewards(this.bob.address)).to.equal("0")
+
 			await advanceBlockTo(startBlock - 1)
-
 			await this.chef.connect(this.bob).deposit("0") // block 100
-			expect(await this.mead.balanceOf(this.bob.address)).to.equal("0")
-			await advanceBlockTo(startBlock)
+			expect(await this.chef.pendingRewards(this.bob.address)).to.equal("0")
 
-			await this.chef.connect(this.bob).deposit("0") // block 101
-			expect(await this.mead.balanceOf(this.bob.address)).to.equal(100 * FIRST_BONUS_MULTIPLIER)
+			await advanceBlockTo(startBlock + 3)
+			// await this.chef.connect(this.bob).deposit("0") // block 101
+			expect(await this.chef.pendingRewards(this.bob.address)).to.equal(100 * FIRST_BONUS_MULTIPLIER * 3)
 
 			await advanceBlockTo(startBlock + 4)
 			await this.chef.connect(this.bob).deposit("0") // block 105
+			expect(await this.chef.pendingRewards(this.bob.address)).to.equal(100 * FIRST_BONUS_MULTIPLIER * 5)
 
-			expect(await this.mead.balanceOf(this.bob.address)).to.equal(100 * FIRST_BONUS_MULTIPLIER * 5)
-			expect(await this.mead.balanceOf(this.chef.address)).to.equal(1000000000 - 100 * FIRST_BONUS_MULTIPLIER * 5);
+			await this.chef.connect(this.bob).harvest();
+			expect(await this.mead.balanceOf(this.bob.address)).to.equal(100 * FIRST_BONUS_MULTIPLIER * 6)
+			expect(await this.chef.pendingRewards(this.bob.address)).to.equal(0)
+			expect(await this.mead.balanceOf(this.chef.address)).to.equal(1000000000 - 100 * FIRST_BONUS_MULTIPLIER * 6);
 
 			// Checking second bonus multiplier
 			await advanceBlockTo(startBlock + 99);
 			await this.chef.connect(this.bob).deposit("0") // block 200
-			expect(await this.mead.balanceOf(this.bob.address)).to.equal(100 * FIRST_BONUS_MULTIPLIER * 100)
+			expect(await this.chef.pendingRewards(this.bob.address)).to.equal(100 * FIRST_BONUS_MULTIPLIER * (100 - 6))
 
-			await advanceBlockTo(startBlock + 104);
-			await this.chef.connect(this.bob).deposit("0") // block 205
-			expect(await this.mead.balanceOf(this.bob.address)).to.equal(
-				100 * FIRST_BONUS_MULTIPLIER * 100 +
+			await advanceBlockTo(startBlock + 105); // block 205
+			expect(await this.chef.pendingRewards(this.bob.address)).to.equal(
+				100 * FIRST_BONUS_MULTIPLIER * (100 - 6) +
 				100 * SECOND_BONUS_MULTIPLIER * 5
 			)
 
 			// Check third bonus multiplier
 			await advanceBlockTo(startBlock + 204);
 			await this.chef.connect(this.bob).deposit("0") // block 205
-			expect(await this.mead.balanceOf(this.bob.address)).to.equal(
-				100 * FIRST_BONUS_MULTIPLIER * 100 +
+			expect(await this.chef.pendingRewards(this.bob.address)).to.equal(
+				100 * FIRST_BONUS_MULTIPLIER * (100 - 6) +
 				100 * SECOND_BONUS_MULTIPLIER * 100 +
 				100 * 5
 			)
+
+			await this.chef.connect(this.bob).harvest(); // block 206
+			expect(await this.mead.balanceOf(this.bob.address)).to.equal(
+				100 * FIRST_BONUS_MULTIPLIER * 100 +
+				100 * SECOND_BONUS_MULTIPLIER * 100 +
+				100 * 6
+			);
+			expect(await this.chef.pendingRewards(this.bob.address)).to.equal(0);
 		})
 
 		it("should not distribute MEADs if no one deposit", async function () {
@@ -149,13 +156,13 @@ describe("TavernStaking", function () {
 			const startBlock = await ethers.provider.getBlockNumber() + 100;
 			this.chef = <TavernStaking>await deployProxy("TavernStaking",
 				this.mead.address,
+				this.lp.address,
 				100,	// rewardPerBlock
 				startBlock,	// startBlock
 				startBlock + 100,	// firstBonusBlock
 				startBlock + 200	// secondBonusBlock
 			);
 			await this.chef.deployed()
-			await this.chef.setPoolInfo(this.lp.address, false)
 			await this.mead.transfer(this.chef.address, 1000000000);
 			await this.lp.connect(this.bob).approve(this.chef.address, "1000")
 
@@ -170,6 +177,7 @@ describe("TavernStaking", function () {
 			expect(await this.mead.balanceOf(this.chef.address)).to.equal(1000000000);
 			expect(await this.mead.balanceOf(this.bob.address)).to.equal(0)
 			expect(await this.lp.balanceOf(this.bob.address)).to.equal(1000 - 10)
+
 			await advanceBlockTo(startBlock + 19)
 			await this.chef.connect(this.bob).withdraw(10) // block 220
 			expect(await this.mead.balanceOf(this.chef.address)).to.equal(1000000000 - 100 * FIRST_BONUS_MULTIPLIER * 10);
@@ -182,13 +190,13 @@ describe("TavernStaking", function () {
 			const startBlock = await ethers.provider.getBlockNumber() + 100;
 			this.chef = <TavernStaking>await deployProxy("TavernStaking",
 				this.mead.address,
+				this.lp.address,
 				100,	// rewardPerBlock
 				startBlock,	// startBlock
 				startBlock + 100,	// firstBonusBlock
 				startBlock + 200	// secondBonusBlock
 			);
 			await this.chef.deployed()
-			await this.chef.setPoolInfo(this.lp.address, false)
 			await this.mead.transfer(this.chef.address, initialSupply);
 
 			await this.lp.connect(this.alice).approve(this.chef.address, "1000", {
@@ -209,23 +217,27 @@ describe("TavernStaking", function () {
 			// Carol deposits 30 LPs at block 318
 			await advanceBlockTo(startBlock + 17)
 			await this.chef.connect(this.carol).deposit(30, { from: this.carol.address })
+
 			//   Alice deposits 10 more LPs at block 320. At this point:
 			//   Alice should have: 4*600 + 4*1/3*600 + 2*1/6*600 = 3400
-			//   TavernStaking should have the remaining: 10000 - 3400 = 6600
+			//   Bob: 							4*2/3*600 + 2*2/6*600 = 2000
+			//   Carol:							2*3/6*600 = 600
 			await advanceBlockTo(startBlock + 19)
 			await this.chef.connect(this.alice).deposit(10, { from: this.alice.address })
-			expect(await this.mead.balanceOf(this.alice.address)).to.equal(3400)
-			expect(await this.mead.balanceOf(this.bob.address)).to.equal(0)
-			expect(await this.mead.balanceOf(this.carol.address)).to.equal(0)
-			expect(await this.mead.balanceOf(this.chef.address)).to.equal(initialSupply.sub(3400))
+			expect(await this.chef.pendingRewards(this.alice.address)).to.equal(3400)
+			expect(await this.chef.pendingRewards(this.bob.address)).to.equal(2000)
+			expect(await this.chef.pendingRewards(this.carol.address)).to.equal(600)
+
 			// Bob withdraws 5 LPs at block 330. At this point:
-			//   Bob should have: 4*2/3*600 + 2*2/6*600 + 10*2/7*600 = 3714
+			//   Bob should have: 2000 + 10*2/7*600 = 3714
+			//   Alice: 3400 + 10*2/7*600 = 5114
+			//   Carol: 600 + 10*3/7*600 = 3171
 			await advanceBlockTo(startBlock + 29)
 			await this.chef.connect(this.bob).withdraw(5, { from: this.bob.address })
-			expect(await this.mead.balanceOf(this.alice.address)).to.equal(3400)
 			expect(await this.mead.balanceOf(this.bob.address)).to.equal(3714)
-			expect(await this.mead.balanceOf(this.carol.address)).to.equal(0)
-			expect(await this.mead.balanceOf(this.chef.address)).to.equal(initialSupply.sub(3400 + 3714))
+			expect(await this.chef.pendingRewards(this.alice.address)).to.equal(5114)
+			expect(await this.chef.pendingRewards(this.carol.address)).to.equal(3171)
+			expect(await this.chef.pendingRewards(this.bob.address)).to.equal(0)
 			// Alice withdraws 20 LPs at block 340.
 			// Bob withdraws 15 LPs at block 350.
 			// Carol withdraws 30 LPs at block 360.
@@ -249,22 +261,38 @@ describe("TavernStaking", function () {
 			expect(await this.lp.balanceOf(this.carol.address)).to.equal("1000")
 		})
 
-		// 	it("should stop giving bonus MEADs after the bonus period ends", async function () {
-		// 		// 100 per block farming rate starting at block 500 with bonus until block 600
-		// 		this.chef = await this.TavernStaking.deploy(this.mead.address, this.dev.address, "100", "500", "600")
-		// 		await this.mead.transferOwnership(this.chef.address)
-		// 		await this.lp.connect(this.alice).approve(this.chef.address, "1000", { from: this.alice.address })
-		// 		await this.chef.setPoolInfo(this.lp.address, true)
-		// 		// Alice deposits 10 LPs at block 590
-		// 		await advanceBlockTo("589")
-		// 		await this.chef.connect(this.alice).deposit(0, "10", { from: this.alice.address })
-		// 		// At block 605, she should have 1000*10 + 100*5 = 10500 pending.
-		// 		await advanceBlockTo("605")
-		// 		expect(await this.chef.pendingRewards(0, this.alice.address)).to.equal("10500")
-		// 		// At block 606, Alice withdraws all pending rewards and should get 10600.
-		// 		await this.chef.connect(this.alice).deposit(0, "0", { from: this.alice.address })
-		// 		expect(await this.chef.pendingRewards(0, this.alice.address)).to.equal("0")
-		// 		expect(await this.mead.balanceOf(this.alice.address)).to.equal("10600")
-		// 	})
+		it("should stop giving bonus MEADs after the bonus period ends", async function () {
+			// 100 per block farming rate starting at block 500 with bonus until block 600
+			const startBlock = await ethers.provider.getBlockNumber() + 100;
+			this.chef = <TavernStaking>await deployProxy("TavernStaking",
+				this.mead.address,
+				this.lp.address,
+				100,	// rewardPerBlock
+				startBlock,	// startBlock
+				startBlock + 100,	// firstBonusBlock
+				startBlock + 200	// secondBonusBlock
+			);
+			await this.chef.deployed()
+			await this.mead.transfer(this.chef.address, initialSupply);
+			await this.lp.connect(this.alice).approve(this.chef.address, "1000", { from: this.alice.address })
+
+			// Alice deposits 10 LPs at block 590
+			await advanceBlockTo(startBlock + 89)
+			await this.chef.connect(this.alice).deposit("10", { from: this.alice.address })
+			// At block 605, she should have 600*10 + 300*5 = 7500 pending.
+			await advanceBlockTo(startBlock + 105)
+			expect(await this.chef.pendingRewards(this.alice.address)).to.equal(7500)
+			// At block 705, she should have 600*10 + 300*100 + 100*5 = 36500 pending.
+			await advanceBlockTo(startBlock + 205)
+			expect(await this.chef.pendingRewards(this.alice.address)).to.equal(36500)
+			// At block 706, Alice withdraws all pending rewards and should get 36600.
+			await this.chef.connect(this.alice).harvest();
+			expect(await this.chef.pendingRewards(this.alice.address)).to.equal(0)
+			expect(await this.mead.balanceOf(this.alice.address)).to.equal(36600)
+
+			// At block 800, 600*10 + 300*100 + 100*100 - 36600 = 9400
+			await advanceBlockTo(startBlock + 300)
+			expect(await this.chef.pendingRewards(this.alice.address)).to.equal(9400)
+		})
 	})
 })

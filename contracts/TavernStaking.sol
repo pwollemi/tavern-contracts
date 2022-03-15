@@ -53,10 +53,12 @@ contract TavernStaking is Initializable, OwnableUpgradeable {
 
     event Deposit(address indexed user, uint256 amount);
     event Withdraw(address indexed user, uint256 amount);
+    event Harvest(address indexed user, uint256 amount);
     event EmergencyWithdraw(address indexed user,uint256 amount);
 
     function initialize(
         address _mead,
+        address _lpToken,
         uint256 _meadPerBlock,
         uint256 _startBlock,
         uint256 _bonusFirstEndBlock,
@@ -69,21 +71,9 @@ contract TavernStaking is Initializable, OwnableUpgradeable {
         bonusFirstEndBlock = _bonusFirstEndBlock;
         bonusSecondEndBlock = _bonusSecondEndBlock;
         startBlock = _startBlock;
-    }
-
-    // Set pool info of LP token to the pool. Can only be called by the owner.
-    function setPoolInfo(
-        address _lpToken,
-        bool _withUpdate
-    ) public onlyOwner {
-        if (_withUpdate) {
-            updatePool();
-        }
-        uint256 lastRewardBlock =
-            block.number > startBlock ? block.number : startBlock;
         poolInfo = PoolInfo({
             lpToken: _lpToken,
-            lastRewardBlock: lastRewardBlock,
+            lastRewardBlock: startBlock,
             accMeadPerShare: 0
         });
     }
@@ -129,7 +119,7 @@ contract TavernStaking is Initializable, OwnableUpgradeable {
 
     // View function to see pending MEADs on frontend.
     function pendingRewards(address _user)
-        external
+        public
         view
         returns (uint256)
     {
@@ -143,7 +133,8 @@ contract TavernStaking is Initializable, OwnableUpgradeable {
                 meadReward.mul(1e12).div(lpSupply)
             );
         }
-        return user.amount.mul(accMeadPerShare).div(1e12).sub(user.rewardDebt);
+        return user.amount.mul(accMeadPerShare).div(1e12)
+            .sub(user.rewardDebt);
     }
 
     // Update reward variables of the given pool to be up-to-date.
@@ -168,35 +159,39 @@ contract TavernStaking is Initializable, OwnableUpgradeable {
     function deposit(uint256 _amount) public {
         UserInfo storage user = userInfo[msg.sender];
         updatePool();
-        if (user.amount > 0) {
-            uint256 pending =
-                user.amount.mul(poolInfo.accMeadPerShare).div(1e12).sub(
-                    user.rewardDebt
-                );
-            safeMeadTransfer(msg.sender, pending);
-        }
         IERC20Upgradeable(poolInfo.lpToken).safeTransferFrom(
             address(msg.sender),
             address(this),
             _amount
         );
         user.amount = user.amount.add(_amount);
-        user.rewardDebt = user.amount.mul(poolInfo.accMeadPerShare).div(1e12);
+        user.rewardDebt = _amount.mul(poolInfo.accMeadPerShare).div(1e12).add(user.rewardDebt);
         emit Deposit(msg.sender, _amount);
+    }
+
+    // Claim pending rewards
+    function harvest() public {
+        UserInfo storage user = userInfo[msg.sender];
+        updatePool();
+        uint pending = user.amount.mul(poolInfo.accMeadPerShare).div(1e12).sub(user.rewardDebt);
+        user.rewardDebt = user.amount.mul(poolInfo.accMeadPerShare).div(1e12);
+        require(pending > 0, "Nothing to claim");
+        if(pending > 0) {
+            safeMeadTransfer(msg.sender, pending);
+        }
+        emit Harvest(msg.sender, pending);
     }
 
     // Withdraw LP tokens from MasterChef.
     function withdraw(uint256 _amount) public {
+        require(_amount > 0, 'amount 0');
         UserInfo storage user = userInfo[msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
-        updatePool();
-        uint256 pending =
-            user.amount.mul(poolInfo.accMeadPerShare).div(1e12).sub(
-                user.rewardDebt
-            );
-        safeMeadTransfer(msg.sender, pending);
+        harvest();
+
+        user.rewardDebt = user.amount.sub(_amount).mul(poolInfo.accMeadPerShare).div(1e12);
         user.amount = user.amount.sub(_amount);
-        user.rewardDebt = user.amount.mul(poolInfo.accMeadPerShare).div(1e12);
+
         IERC20Upgradeable(poolInfo.lpToken).safeTransfer(address(msg.sender), _amount);
         emit Withdraw(msg.sender, _amount);
     }
