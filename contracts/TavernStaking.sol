@@ -7,11 +7,12 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
 contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
-    using SafeMath for uint256;
+    using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
     // Info of each user.
     struct UserInfo {
@@ -43,10 +44,11 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
     // MEAD tokens created per block.
     uint256 public meadPerBlock;
     // Bonus muliplier for early mead makers.
-    uint256 public constant FIRST_BONUS_MULTIPLIER = 6;
-    uint256 public constant SECOND_BONUS_MULTIPLIER = 3;
+    uint256 public constant FIRST_BONUS_MULTIPLIER = 1800;
+    uint256 public constant SECOND_BONUS_MULTIPLIER = 450;
     // The block number when MEAD mining starts.
     uint256 public startBlock;
+    uint256 public rewardEndBlock;
     // Info of each pool.
     PoolInfo public poolInfo;
     // Info of each user that stakes LP tokens.
@@ -62,6 +64,7 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         address _lpToken,
         uint256 _meadPerBlock,
         uint256 _startBlock,
+        uint256 _endBlock,
         uint256 _bonusFirstEndBlock,
         uint256 _bonusSecondEndBlock
     ) external initializer {
@@ -72,11 +75,26 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         bonusFirstEndBlock = _bonusFirstEndBlock;
         bonusSecondEndBlock = _bonusSecondEndBlock;
         startBlock = _startBlock;
+        rewardEndBlock = _endBlock;
+        require(_bonusSecondEndBlock < rewardEndBlock);
         poolInfo = PoolInfo({
             lpToken: _lpToken,
             lastRewardBlock: startBlock,
             accMeadPerShare: 0
         });
+    }
+
+    function getCurrentRewardsPerBlock() public view returns (uint256) {
+        if(block.number < startBlock || block.number >= rewardEndBlock) {
+            return 0;
+        }
+        if(block.number < bonusFirstEndBlock) {
+            return meadPerBlock.mul(FIRST_BONUS_MULTIPLIER).div(100);
+        } else if(block.number < bonusSecondEndBlock) {
+            return meadPerBlock.mul(SECOND_BONUS_MULTIPLIER).div(100);
+        } else {
+            return meadPerBlock;
+        }
     }
 
     // Return reward multiplier over the given _from to _to block.
@@ -85,29 +103,30 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         view
         returns (uint256)
     {
+        _to = MathUpgradeable.min(rewardEndBlock, _to);
         if(_from >= _to) {
             return 0;
         }
         // First case ===> _from <= bonusFirstEndBlock and below 3 cases of _to
         if(_from <= bonusFirstEndBlock) {
             if (_to <= bonusFirstEndBlock) {
-                return _to.sub(_from).mul(FIRST_BONUS_MULTIPLIER);
+                return _to.sub(_from).mul(FIRST_BONUS_MULTIPLIER).div(100);
             } else if(_to > bonusFirstEndBlock && _to <= bonusSecondEndBlock) {
                 return bonusFirstEndBlock.sub(_from).mul(FIRST_BONUS_MULTIPLIER).add(
                     _to.sub(bonusFirstEndBlock).mul(SECOND_BONUS_MULTIPLIER)
-                );
+                ).div(100);
             } else {
                 return bonusFirstEndBlock.sub(_from).mul(FIRST_BONUS_MULTIPLIER).add(
                     bonusSecondEndBlock.sub(bonusFirstEndBlock).mul(SECOND_BONUS_MULTIPLIER)
-                ).add(_to.sub(bonusSecondEndBlock));
+                ).div(100).add(_to.sub(bonusSecondEndBlock));
             }
         }
         // Second case ===> _from <= bonusSecondEndBlock
         else if(_from > bonusFirstEndBlock && _from < bonusSecondEndBlock) {
             if(_to <= bonusSecondEndBlock) {
-                return _to.sub(_from).mul(SECOND_BONUS_MULTIPLIER);
+                return _to.sub(_from).mul(SECOND_BONUS_MULTIPLIER).div(100);
             } else {
-                return bonusSecondEndBlock.sub(_from).mul(SECOND_BONUS_MULTIPLIER).add(
+                return bonusSecondEndBlock.sub(_from).mul(SECOND_BONUS_MULTIPLIER).div(100).add(
                     _to.sub(bonusSecondEndBlock)
                 );
             }
