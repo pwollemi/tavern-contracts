@@ -1,12 +1,12 @@
 import { ethers } from "hardhat";
-import { Brewery_address, Mead_address } from "../NFT_ADDRESSES";
+import { BreweryHelper_address, Brewery_address, Mead_address } from "../NFT_ADDRESSES";
 
 async function main() {
     // The signers
     const [deployer] = await ethers.getSigners();
 
     let addresses = [
-        "0xf0D41ED017dB1eBA5f58E705681c2f312BfAc5AC", // Gnosis Treasury
+        BreweryHelper_address,
     ]
 
     const Mead = await ethers.getContractAt("Mead", Mead_address);

@@ -485,11 +485,13 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
 
         // Handle production rate upgrades
         if (renovation.getType(_renovationId) == renovation.PRODUCTION_RATE()) {
+            require(breweryStats[_tokenId].productionRatePerSecondMultiplier < renovation.getIntValue(_renovationId), "Cannot apply a lesser upgrade than what is already on");
             breweryStats[_tokenId].productionRatePerSecondMultiplier = renovation.getIntValue(_renovationId);
         } 
         
         // Handle fermentation period upgrades
         if (renovation.getType(_renovationId) == renovation.FERMENTATION_PERIOD()) {
+            require(breweryStats[_tokenId].fermentationPeriodMultiplier > renovation.getIntValue(_renovationId), "Cannot apply a lesser upgrade than what is already on");
             breweryStats[_tokenId].fermentationPeriodMultiplier = renovation.getIntValue(_renovationId);
         } 
         

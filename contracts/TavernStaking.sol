@@ -8,8 +8,9 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
-contract TavernStaking is Initializable, OwnableUpgradeable {
+contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeMath for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
     // Info of each user.
@@ -156,7 +157,7 @@ contract TavernStaking is Initializable, OwnableUpgradeable {
     }
 
     // Deposit LP tokens to MasterChef for MEAD allocation.
-    function deposit(uint256 _amount) public {
+    function deposit(uint256 _amount) public nonReentrant {
         UserInfo storage user = userInfo[msg.sender];
         updatePool();
         IERC20Upgradeable(poolInfo.lpToken).safeTransferFrom(
@@ -177,13 +178,13 @@ contract TavernStaking is Initializable, OwnableUpgradeable {
         user.rewardDebt = user.amount.mul(poolInfo.accMeadPerShare).div(1e12);
         require(pending > 0, "Nothing to claim");
         if(pending > 0) {
-            safeMeadTransfer(msg.sender, pending);
+            _safeMeadTransfer(msg.sender, pending);
         }
         emit Harvest(msg.sender, pending);
     }
 
     // Withdraw LP tokens from MasterChef.
-    function withdraw(uint256 _amount) public {
+    function withdraw(uint256 _amount) external nonReentrant {
         require(_amount > 0, 'amount 0');
         UserInfo storage user = userInfo[msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
@@ -206,7 +207,7 @@ contract TavernStaking is Initializable, OwnableUpgradeable {
     }
 
     // Safe mead transfer function, just in case if rounding error causes pool to not have enough MEADs.
-    function safeMeadTransfer(address _to, uint256 _amount) internal {
+    function _safeMeadTransfer(address _to, uint256 _amount) internal {
         uint256 meadBal = IERC20(mead).balanceOf(address(this));
         if (_amount > meadBal) {
             IERC20(mead).transfer(_to, meadBal);
