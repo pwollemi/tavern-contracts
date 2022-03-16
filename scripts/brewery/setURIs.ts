@@ -12,17 +12,20 @@ async function main() {
 
     const Brewery = await ethers.getContractAt("Brewery", Brewery_address)
     
-    const baseURI = "https://ipfs.tavern.money/ipfs/QmRxxZvujy4uSihCJ8vRU1vacdDKoterG5Rwsfz2cmTwqU"
+    const baseURI = "https://ipfs.tavern.money/ipfs/QmZrowT3fcdAbqe2V2DMJT7bPFT2XptbjHdg3KeKMvV1Yi"
     const types = 8;
     const tiers = 3;
 
-    await Brewery.setBaseURI(baseURI)
+    let txCount = await deployer.getTransactionCount();
+    await Brewery.setBaseURI(baseURI, { nonce: txCount});
+    txCount++;
+
     for (let type = 0; type < types; ++type) {
       for (let tier = 0; tier < tiers; ++tier) {
         const tokenURI = `/type/${type}/tier/${tier}.json`
-        let tx = await Brewery.setTokenURI(type, tier, tokenURI)
-        await tx.wait();
+        await Brewery.setTokenURI(type, tier, tokenURI, { nonce: txCount})
         console.log(`${baseURI}${tokenURI} set!`)
+        txCount++;
       }
     }
 }
