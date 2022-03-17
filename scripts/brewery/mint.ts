@@ -14,19 +14,22 @@ async function main() {
     console.log("Current Supply", await Brewery.totalSupply());
 
     let addresses = [
-      ["0xc198CAe628C26076Cf94D1bfDf67E021D908646D", 20],
+      ["0x04FaF8D329F491B19c47561Dee5bd379d7b9AFeC", 4],
+      ["0x95886Ae20C0A55880aaCb1E05081Eda4FC1a105C", 2],
     ]
 
     let minted = 0;
+    let txCount = await deployer.getTransactionCount();
     for (let i = 0; i < addresses.length; ++i) {
       const address = addresses[i][0];
       const amount = addresses[i][1];
+      console.log(`Minting ${amount} BREWERYs to ${address}`)
       for (let j = 0; j < amount; ++j) {
         try {
-          let tx = await Brewery.mint(address.toString(), "");
-          await tx.wait();
-          console.log(`Minted ${j+1}`)
+          await Brewery.mint(address.toString(), "", {nonce: txCount});
+          console.log(`\tMinted ${j+1}`)
           minted++;
+          txCount++;
         } catch(e) {
           console.log(`Couldn't airdrop ${address}`)
           break;

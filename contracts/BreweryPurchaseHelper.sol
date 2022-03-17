@@ -11,6 +11,7 @@ import "./ERC-721/Brewery.sol";
 import "./ClassManager.sol";
 import "./ERC-20/xMead.sol";
 import "./ERC-20/Mead.sol";
+import "./TavernStaking.sol";
 
 /**
  * @notice There are some conditions to make this work
@@ -58,6 +59,12 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
 
     /// @notice Relevant events to emit
     event Redeemed(address account, uint256 amount);
+
+    /// @notice The amount of discount to apply to people converting staked LP
+    uint256 public conversionDiscount;
+
+    /// @notice How long people have to have their LP tokens staked before 
+    uint256 public conversionPeriodRequirement;
 
     function initialize(address _settings, address _brewery) external initializer {
         __Ownable_init();
@@ -151,7 +158,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
     /**
      * @notice Purchases a BREWERY using LP tokens
      */
-    function purchaseWithLP(uint256 amount) external {
+    function purchaseWithLP(uint256 amount) public {
         require(amount > 0, "Amount must be above zero");
         require(amount <= settings.txLimit(), "Cant go above tx limit!");
         require(isLPEnabled, "LP discount off");
@@ -169,16 +176,21 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         }
     }
 
-    /**
-     * @notice Purchases a BREWERY using USDC and automatically converting into LP tokens 
-     */
-    function purchaseWithLPUsingZap(uint256 _amount) external {
+    function _getBreweryCostWithLPDiscount(uint256 _amount) internal view returns (uint256) {
         uint256 discount = calculateLPDiscount();
 
         // Get the price of a brewery as if it were valued at the LP tokens rate + a fee for automatically zapping for you
         // Bear in mind this will still be discounted even though we take an extra fee!
         uint256 breweryCost = _amount * getUSDCForMead(settings.breweryCost());
-        uint256 breweryCostWithLPDiscount = breweryCost - breweryCost * (discount - zapFee) / 1e4;
+        return breweryCost - breweryCost * (discount - zapFee) / 1e4;
+
+    }
+
+    /**
+     * @notice Purchases a BREWERY using USDC and automatically converting into LP tokens 
+     */
+    function purchaseWithLPUsingZap(uint256 _amount) external {
+        uint256 breweryCostWithLPDiscount = _getBreweryCostWithLPDiscount(_amount);
 
         /// @notice Handles the zapping of liquitity for us + an extra fee
         /// @dev The LP tokens will now be in the hands of the msg.sender
@@ -191,6 +203,46 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         for(uint256 i = 0; i < _amount; ++i) {
             _mint(msg.sender, "", settings.reputationForLP());
         }
+    }
+
+    /**
+     * @notice Converts staked LPs into BREWERYs
+     */
+    function convertStakeIntoBrewerys(address stakingAddress, uint256 stakeAmount) external {
+        TavernStaking staking = TavernStaking(stakingAddress);
+        (uint256 amount,,,uint256 lastTimeDeposited) = staking.userInfo(msg.sender);
+        require(stakeAmount <= amount, "You havent staked this amount");
+        require(lastTimeDeposited + conversionPeriodRequirement < block.timestamp, "Need to stake for longer to convert");
+
+        // Attempt to withdraw the stake via the staking contract
+        // This gives msg.sender LP tokens + MEAD rewards
+        TavernStaking(stakingAddress).withdraw(msg.sender, stakeAmount);
+
+        // Calculate how many BREWERYs this affords
+        uint256 lpPrice = getUSDCForOneLP();
+        uint256 fullLPValueUSDC = stakeAmount * lpPrice;
+        uint256 costOfOneBrewery = _getBreweryCostWithLPDiscount(1);
+        costOfOneBrewery = costOfOneBrewery - costOfOneBrewery * conversionDiscount / 1e4;
+
+        uint256 breweryAmount = fullLPValueUSDC / costOfOneBrewery;
+
+        uint256 toPay = breweryAmount * costOfOneBrewery / lpPrice;
+
+        // Send the tokens from the account transacting this function to the taverns keep
+        settings.liquidityPair().transferFrom(msg.sender, settings.tavernsKeep(), toPay);
+
+        // Mint logic
+        purchaseWithLP(breweryAmount);
+    }
+
+    /**
+     * @notice Function that calculates how many BREWERYs you can purchase for `amount`
+     */
+    function getBreweryAmountFromLP(uint256 amount) public view returns (uint256) {
+        uint256 lpPrice = getUSDCForOneLP();
+        uint256 lpValue = amount * lpPrice;
+        uint256 costOfOneBrewery = _getBreweryCostWithLPDiscount(1);
+        return lpValue / costOfOneBrewery;
     }
 
     /**
@@ -369,5 +421,13 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
 
     function setZapSlippage(uint256 _zap) external onlyOwner {
         zapSlippage = _zap;
+    }
+
+    function setConversionDiscount(uint256 _discount) external onlyOwner {
+        conversionDiscount = _discount;
+    }
+
+    function setConversionPeriodRequirement(uint256 _requirement) external onlyOwner {
+        conversionPeriodRequirement = _requirement;
     }
 }
