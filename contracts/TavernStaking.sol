@@ -43,8 +43,8 @@ contract TavernStaking is Initializable, OwnableUpgradeable {
     // MEAD tokens created per block.
     uint256 public meadPerBlock;
     // Bonus muliplier for early mead makers.
-    uint256 public constant FIRST_BONUS_MULTIPLIER = 1800;
-    uint256 public constant SECOND_BONUS_MULTIPLIER = 450;
+    uint256 public FIRST_BONUS_MULTIPLIER = 1800;
+    uint256 public SECOND_BONUS_MULTIPLIER = 450;
     // The block number when MEAD mining starts.
     uint256 public startBlock;
     uint256 public rewardEndBlock;
@@ -232,5 +232,13 @@ contract TavernStaking is Initializable, OwnableUpgradeable {
         } else {
             IERC20(mead).transfer(_to, _amount);
         }
+    }
+
+    function setBonusMultiplier(
+        uint first,
+        uint second
+    ) public onlyOwner {
+        FIRST_BONUS_MULTIPLIER = first;
+        SECOND_BONUS_MULTIPLIER = second;
     }
 }
