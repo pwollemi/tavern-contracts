@@ -18,6 +18,8 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
     struct UserInfo {
         uint256 amount; // How many LP tokens the user has provided.
         uint256 rewardDebt; // Reward debt. See explanation below.
+        uint256 firstTimeDeposited;
+        uint256 lastTimeDeposited; 
         //
         // We do some fancy math here. Basically, any point in time, the amount of MEADs
         // entitled to a user but is pending to be distributed is:
@@ -44,8 +46,8 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
     // MEAD tokens created per block.
     uint256 public meadPerBlock;
     // Bonus muliplier for early mead makers.
-    uint256 public constant FIRST_BONUS_MULTIPLIER = 1800;
-    uint256 public constant SECOND_BONUS_MULTIPLIER = 450;
+    uint256 public constant FIRST_BONUS_MULTIPLIER = 300;
+    uint256 public constant SECOND_BONUS_MULTIPLIER = 150;
     // The block number when MEAD mining starts.
     uint256 public startBlock;
     uint256 public rewardEndBlock;
@@ -176,51 +178,61 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
     }
 
     // Deposit LP tokens to MasterChef for MEAD allocation.
-    function deposit(uint256 _amount) public nonReentrant {
-        UserInfo storage user = userInfo[msg.sender];
+    function deposit(address account, uint256 _amount) public nonReentrant {
+        UserInfo storage user = userInfo[account];
         updatePool();
         IERC20Upgradeable(poolInfo.lpToken).safeTransferFrom(
-            address(msg.sender),
+            account,
             address(this),
             _amount
         );
         user.amount = user.amount.add(_amount);
+        if (user.firstTimeDeposited == 0) {
+            user.firstTimeDeposited = block.timestamp;
+        }
+        user.lastTimeDeposited = block.timestamp;
         user.rewardDebt = _amount.mul(poolInfo.accMeadPerShare).div(1e12).add(user.rewardDebt);
-        emit Deposit(msg.sender, _amount);
+        emit Deposit(account, _amount);
     }
 
     // Claim pending rewards
-    function harvest() public {
-        UserInfo storage user = userInfo[msg.sender];
+    function harvest(address account) external nonReentrant {
+        UserInfo storage user = userInfo[account];
         updatePool();
         uint pending = user.amount.mul(poolInfo.accMeadPerShare).div(1e12).sub(user.rewardDebt);
         user.rewardDebt = user.amount.mul(poolInfo.accMeadPerShare).div(1e12);
         require(pending > 0, "Nothing to claim");
         if(pending > 0) {
-            _safeMeadTransfer(msg.sender, pending);
+            _safeMeadTransfer(account, pending);
         }
-        emit Harvest(msg.sender, pending);
+        emit Harvest(account, pending);
     }
 
     // Withdraw LP tokens from MasterChef.
-    function withdraw(uint256 _amount) external nonReentrant {
+    function withdraw(address account, uint256 _amount) external nonReentrant {
         require(_amount > 0, 'amount 0');
-        UserInfo storage user = userInfo[msg.sender];
+        UserInfo storage user = userInfo[account];
         require(user.amount >= _amount, "withdraw: not good");
-        harvest();
+        
+        updatePool();
+        uint pending = user.amount.mul(poolInfo.accMeadPerShare).div(1e12).sub(user.rewardDebt);
+        user.rewardDebt = user.amount.mul(poolInfo.accMeadPerShare).div(1e12);
+        if(pending > 0) {
+            _safeMeadTransfer(account, pending);
+        }
 
         user.rewardDebt = user.amount.sub(_amount).mul(poolInfo.accMeadPerShare).div(1e12);
         user.amount = user.amount.sub(_amount);
 
         IERC20Upgradeable(poolInfo.lpToken).safeTransfer(address(msg.sender), _amount);
-        emit Withdraw(msg.sender, _amount);
+        emit Withdraw(account, _amount);
     }
 
     // Withdraw without caring about rewards. EMERGENCY ONLY.
-    function emergencyWithdraw() public {
-        UserInfo storage user = userInfo[msg.sender];
+    function emergencyWithdraw(address account) public {
+        UserInfo storage user = userInfo[account];
         IERC20Upgradeable(poolInfo.lpToken).safeTransfer(address(msg.sender), user.amount);
-        emit EmergencyWithdraw(msg.sender, user.amount);
+        emit EmergencyWithdraw(account, user.amount);
         user.amount = 0;
         user.rewardDebt = 0;
     }

@@ -5,7 +5,7 @@ async function main() {
     // The signers
     const [deployer] = await ethers.getSigners();
 
-    const sellTax = 13;
+    const sellTax = 10;
     const Mead = await ethers.getContractAt("Mead", Mead_address);
     await Mead.setSellTax(sellTax);
     console.log(`Sell tax set to ${sellTax}%`)
