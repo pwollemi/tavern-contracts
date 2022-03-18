@@ -100,6 +100,9 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
     /// @notice The total amount of breweries (totalSupply cant go over this)
     uint256 public maxBreweries;
 
+    /// @notice The last time this user claimed
+    mapping(address => uint256) lastTimeClaimed;
+
     function initialize(
         address _tavernSettings,
         uint256 _fermentationPeriod,
@@ -448,6 +451,13 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
         IERC20Upgradeable mead = IERC20Upgradeable(settings.mead());
         mead.safeTransferFrom(settings.rewardsPool(), msg.sender, rewardAmount);
         mead.safeTransferFrom(settings.rewardsPool(), settings.tavernsKeep(), treasuryAmount);
+
+        if (lastTimeClaimed[msg.sender] + fermentationPeriod <= block.timestamp) {
+            uint256 daysNotClaimed = (block.timestamp - lastTimeClaimed[msg.sender] - fermentationPeriod) / 1 days;
+            ClassManager.addReputation(msg.sender, 20 * daysNotClaimed);
+        }
+
+        lastTimeClaimed[msg.sender] = block.timestamp;
     }
 
     /**
