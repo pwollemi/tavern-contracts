@@ -266,6 +266,11 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         // stakeAmount         100 000000000000000000
         // lpPriceUSD          100 000000
         // stakeAmountUSD      100 000000
+        // breweryCostUSD      600 000000
+        // breweryAmount       6
+        // toPayLP             breweryAmount * breweryCostUSD / lpPriceUSD
+        //                     6             * 600 000000     / 100 000000
+        //                     12
         uint256 lpPriceUSD = getUSDCForOneLP(); // 100 000000
         uint256 stakeAmountUSD = stakeAmount * lpPriceUSD / settings.liquidityPair().decimals();
         uint256 breweryCostUSD = getBreweryCostWithLPAndConvertDiscount(1);
