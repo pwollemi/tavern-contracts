@@ -67,7 +67,7 @@ const config: HardhatUserConfig = {
     },
     avaxmainnet: {
       url: process.env.AVAX_MAINNET,
-      gasPrice: 150000000000,
+      gasPrice: 160000000000,
       accounts:
         process.env.PRIVATE_KEY2 !== undefined ? [process.env.PRIVATE_KEY2, process.env.PRIVATE_KEY3, process.env.PRIVATE_KEY4, process.env.RAINBOW_DEPLOY] : [],
     },

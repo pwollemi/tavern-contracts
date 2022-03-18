@@ -18,14 +18,23 @@ async function main() {
     const BreweryPurchaseHelper = await ethers.getContractAt("BreweryPurchaseHelper", BreweryHelper_address)
     const LP = await ethers.getContractAt("IJoePair", await Settings.liquidityPair());
 
-    const rewardsPerBlock = Number(ethers.utils.formatUnits(await Staking.meadPerBlock(), 18));
+    //const rewardsPerBlock = BigNumber.ethers.utils.formatUnits(await Staking.meadPerBlock(), 18);
     const blockPerDay = 36000;
     const meadPrice = await BreweryPurchaseHelper.getMeadforUSDC();
     const lpPrice = await BreweryPurchaseHelper.getUSDCForOneLP();
     const tvl = (await LP.balanceOf(STAKING_ADDRESS)).mul(await BreweryPurchaseHelper.getUSDCForOneLP()).div(1e6);
     
-    console.log("APY", rewardsPerBlock.mul(blockPerDay).mul("365").mul(meadPrice).div(tvl).mul(100))
+    //console.log("APY", rewardsPerBlock.mul(blockPerDay).mul("365").mul(meadPrice).div(tvl).mul(100))
+    const poolInfo = await Staking.poolInfo();
+    console.log("Pool Info", poolInfo);
+    console.log("Current Rewards", await Staking.getCurrentRewardsPerBlock());
+    console.log("Start Block", await Staking.startBlock());
+    console.log("Base Rewards per block", ethers.utils.formatUnits(await Staking.meadPerBlock(), 18));
+    console.log("1st Multipplier", await Staking.firstMultiplier());
+    console.log("2nd Multipplier", await Staking.secondMultiplier());
 
+    const userInfo = await Staking.userInfo("0xf0D41ED017dB1eBA5f58E705681c2f312BfAc5AC")
+    console.log(userInfo);
 }
 
 main()
