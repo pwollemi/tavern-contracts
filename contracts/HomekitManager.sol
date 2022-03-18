@@ -11,8 +11,6 @@ import "./TavernSettings.sol";
 import "./interfaces/IClassManager.sol";
 import "./ERC-20/Mead.sol";
 
-import "hardhat/console.sol";
-
 /**
  * @notice Homekit manager is a smart contract that allows users to purchase small, less efficient BREWERYs at fixed prices
  *        
@@ -109,7 +107,7 @@ contract HomekitManager is Initializable, AccessControlUpgradeable {
     function _createTo(address _to, uint256 count) internal {
         HomekitStats storage stat = homekits[_to];
         require(stat.count + count <= homekitWalletLimit, "Cant go over wallet limit");
-        stat.pendingYields = stat.pendingYields + pendingMead(_to);
+        stat.pendingYields = pendingMead(_to);
         stat.count += count;
         stat.lastTimeClaimed = block.timestamp;
     }
@@ -136,8 +134,6 @@ contract HomekitManager is Initializable, AccessControlUpgradeable {
         uint256 homekitPriceInUSDC = getUSDCForMead(count * homekitPrice);
         uint256 homekitPriceInLP = getLPFromUSDC(homekitPriceInUSDC);
         uint256 discountAmount = homekitPriceInLP * discount / 1e4;
-        console.log(homekitPriceInLP);
-        console.log(discountAmount);
         IJoePair(settings.liquidityPair()).transferFrom(msg.sender, settings.tavernsKeep(), homekitPriceInLP - discountAmount);
 
         _createTo(msg.sender, count);
@@ -180,6 +176,7 @@ contract HomekitManager is Initializable, AccessControlUpgradeable {
      * @notice Returns how many USDC tokens you need for inputed meadAmount
      */
     function getUSDCForMead(uint256 meadAmount) public view returns (uint256) {
+        if (meadAmount == 0) return 0;
         address[] memory path = new address[](2);
         path[0] = settings.usdc();
         path[1] = settings.mead();
@@ -190,11 +187,12 @@ contract HomekitManager is Initializable, AccessControlUpgradeable {
     /**
      * @notice Returns how many MEAD tokens you get for 1 USDC
      */
-    function getMeadforUSDC() public view returns (uint256) {
+    function getMeadforUSDC(uint256 usdcAmount) public view returns (uint256) {
+        if (usdcAmount == 0) return 0;
         address[] memory path = new address[](2);
         path[0] = settings.mead();
         path[1] = settings.usdc();
-        uint256[] memory amountsOut = settings.dexRouter().getAmountsIn(10 ** ERC20Upgradeable(settings.usdc()).decimals(), path);
+        uint256[] memory amountsOut = settings.dexRouter().getAmountsIn(usdcAmount, path);
         return amountsOut[0];
     }
 
@@ -255,7 +253,7 @@ contract HomekitManager is Initializable, AccessControlUpgradeable {
     function getRewardPeriod(uint256 lastClaimed) public view returns (uint256) {
         // If we haven't passed the last time since we claimed (also the create time) then return zero as we haven't started yet
         // If we we passed the last time since we claimed (or the create time), but we haven't passed it 
-        if (block.timestamp < startTime) {
+        if (block.timestamp < startTime || lastClaimed == 0) {
             return 0;
         } else if (lastClaimed < startTime) {
             return block.timestamp - startTime;
@@ -269,8 +267,9 @@ contract HomekitManager is Initializable, AccessControlUpgradeable {
      */
     function pendingMead(address _user) public view returns (uint256) {
         // rewardPeriod is 0 when currentTime is less than start time
-        uint256 rewardPeriod = getRewardPeriod(homekits[_user].lastTimeClaimed);
-        return rewardPeriod * productionRatePerSecond * getMeadforUSDC() + homekits[_user].pendingYields;
+        HomekitStats memory stat = homekits[_user];
+        uint256 rewardPeriod = getRewardPeriod(stat.lastTimeClaimed);
+        return getMeadforUSDC(rewardPeriod * productionRatePerSecond * stat.count) + stat.pendingYields;
     }
 
     /**
@@ -349,6 +348,8 @@ contract HomekitManager is Initializable, AccessControlUpgradeable {
 
         // Claim any leftover tokens over to the user
         _claim(totalRewards - totalCost);
+        homekits[msg.sender].pendingYields = 0;
+        homekits[msg.sender].lastTimeClaimed = block.timestamp;
     }
 
     //////////////////////////////////////////////////////////////
