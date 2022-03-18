@@ -46,8 +46,8 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
     // MEAD tokens created per block.
     uint256 public meadPerBlock;
     // Bonus muliplier for early mead makers.
-    uint256 public FIRST_BONUS_MULTIPLIER = 1800;
-    uint256 public SECOND_BONUS_MULTIPLIER = 450;
+    uint256 public constant FIRST_BONUS_MULTIPLIER = 1800;
+    uint256 public constant SECOND_BONUS_MULTIPLIER = 450;
     // The block number when MEAD mining starts.
     uint256 public startBlock;
     uint256 public rewardEndBlock;
@@ -55,6 +55,9 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
     PoolInfo public poolInfo;
     // Info of each user that stakes LP tokens.
     mapping(address => UserInfo) public userInfo;
+
+    uint256 public firstMultiplier;
+    uint256 public secondMultiplier;
 
     event Deposit(address indexed user, uint256 amount);
     event Withdraw(address indexed user, uint256 amount);
@@ -91,9 +94,9 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
             return 0;
         }
         if(block.number < bonusFirstEndBlock) {
-            return meadPerBlock.mul(FIRST_BONUS_MULTIPLIER).div(100);
+            return meadPerBlock.mul(firstMultiplier).div(100);
         } else if(block.number < bonusSecondEndBlock) {
-            return meadPerBlock.mul(SECOND_BONUS_MULTIPLIER).div(100);
+            return meadPerBlock.mul(secondMultiplier).div(100);
         } else {
             return meadPerBlock;
         }
@@ -112,23 +115,23 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         // First case ===> _from <= bonusFirstEndBlock and below 3 cases of _to
         if(_from <= bonusFirstEndBlock) {
             if (_to <= bonusFirstEndBlock) {
-                return _to.sub(_from).mul(FIRST_BONUS_MULTIPLIER).div(100);
+                return _to.sub(_from).mul(firstMultiplier).div(100);
             } else if(_to > bonusFirstEndBlock && _to <= bonusSecondEndBlock) {
-                return bonusFirstEndBlock.sub(_from).mul(FIRST_BONUS_MULTIPLIER).add(
-                    _to.sub(bonusFirstEndBlock).mul(SECOND_BONUS_MULTIPLIER)
+                return bonusFirstEndBlock.sub(_from).mul(firstMultiplier).add(
+                    _to.sub(bonusFirstEndBlock).mul(secondMultiplier)
                 ).div(100);
             } else {
-                return bonusFirstEndBlock.sub(_from).mul(FIRST_BONUS_MULTIPLIER).add(
-                    bonusSecondEndBlock.sub(bonusFirstEndBlock).mul(SECOND_BONUS_MULTIPLIER)
+                return bonusFirstEndBlock.sub(_from).mul(firstMultiplier).add(
+                    bonusSecondEndBlock.sub(bonusFirstEndBlock).mul(secondMultiplier)
                 ).div(100).add(_to.sub(bonusSecondEndBlock));
             }
         }
         // Second case ===> _from <= bonusSecondEndBlock
         else if(_from > bonusFirstEndBlock && _from < bonusSecondEndBlock) {
             if(_to <= bonusSecondEndBlock) {
-                return _to.sub(_from).mul(SECOND_BONUS_MULTIPLIER).div(100);
+                return _to.sub(_from).mul(secondMultiplier).div(100);
             } else {
-                return bonusSecondEndBlock.sub(_from).mul(SECOND_BONUS_MULTIPLIER).div(100).add(
+                return bonusSecondEndBlock.sub(_from).mul(secondMultiplier).div(100).add(
                     _to.sub(bonusSecondEndBlock)
                 );
             }
@@ -247,12 +250,32 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         }
     }
 
-    function setMeadPerBlock(uint256 amount) public onlyOwner {
-        meadPerBlock = amount;
+    function setStartBlock(uint256 _start) external onlyOwner {
+        startBlock = _start;
     }
 
-    function setBonusMultiplier(uint256 first, uint256 second) public onlyOwner {
-        FIRST_BONUS_MULTIPLIER = first;
-        SECOND_BONUS_MULTIPLIER = second;
+    function setEndBlock(uint256 _block) external onlyOwner {
+        rewardEndBlock = _block;
+    }
+
+    function setBonusFirstBlockEnd(uint256 _block) external onlyOwner {
+        bonusFirstEndBlock = _block;
+    }
+
+    function setBonusSecondBlockEnd(uint256 _block) external onlyOwner {
+        bonusSecondEndBlock = _block;
+    }
+
+    function setMeadPerBlock(uint256 rewards) external onlyOwner {
+        meadPerBlock = rewards;
+    }
+
+    function setBonusMultiplier(uint256 first, uint256 second) external onlyOwner {
+        firstMultiplier = first;
+        secondMultiplier = second;
+    }
+
+    function setPoolInfo(uint256 lastRewardTime) external onlyOwner {
+        poolInfo.lastRewardBlock = lastRewardTime;
     }
 }

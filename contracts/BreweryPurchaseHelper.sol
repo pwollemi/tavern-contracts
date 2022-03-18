@@ -123,7 +123,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
     /**
      * @notice Purchases a BREWERY using MEAD
      */
-    function purchaseWithMead(uint256 amount) external {
+    function purchaseWithMead(uint256 amount) public {
         require(amount > 0, "Amount must be above zero");
         require(amount <= settings.txLimit(), "Cant go above tx limit!");
 
@@ -176,7 +176,10 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         }
     }
 
-    function _getBreweryCostWithLPDiscount(uint256 _amount) internal view returns (uint256) {
+    /**
+     * @notice Returns the price of a BREWERY in USDC, factoring in the LP discount
+     */
+    function getBreweryCostWithLPDiscount(uint256 _amount) public view returns (uint256) {
         uint256 discount = calculateLPDiscount();
 
         // Get the price of a brewery as if it were valued at the LP tokens rate + a fee for automatically zapping for you
@@ -187,10 +190,18 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
     }
 
     /**
+     * @notice Returns the price of a BREWERY in USDC, factoring in both LP + stake conversion discounts
+     */
+    function getBreweryCostWithLPAndConvertDiscount(uint256 _amount) public view returns (uint256) {
+        uint256 cost = getBreweryCostWithLPDiscount(_amount);
+        return cost - cost * conversionDiscount / 1e4;
+    }
+
+    /**
      * @notice Purchases a BREWERY using USDC and automatically converting into LP tokens 
      */
     function purchaseWithLPUsingZap(uint256 _amount) external {
-        uint256 breweryCostWithLPDiscount = _getBreweryCostWithLPDiscount(_amount);
+        uint256 breweryCostWithLPDiscount = getBreweryCostWithLPDiscount(_amount);
 
         /// @notice Handles the zapping of liquitity for us + an extra fee
         /// @dev The LP tokens will now be in the hands of the msg.sender
@@ -206,33 +217,69 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
     }
 
     /**
+     * @notice Compounds the staking pending MEAD rewards into BREWERYs
+     */
+    function compoundPendingStakeRewardsIntoBrewerys(address stakingAddress) external {
+        TavernStaking staking = TavernStaking(stakingAddress);
+        uint256 pendingRewards = staking.pendingRewards(msg.sender);
+
+        // Calculate the cost of a BREWERY for compounding (with converting)
+        uint256 breweryCostWithDiscount = settings.breweryCost() - settings.breweryCost() * conversionDiscount / 1e4;
+        require(pendingRewards >= breweryCostWithDiscount, "Not enough rewards to compound");
+
+        // Withdraw the rewards
+        uint256 balanceBefore = Mead(settings.mead()).balanceOf(msg.sender);
+        TavernStaking(stakingAddress).harvest(msg.sender);
+        uint256 claimed = Mead(settings.mead()).balanceOf(msg.sender) - balanceBefore;
+
+        // Find out how many brewerys we can afford
+        uint256 breweryAmount = claimed / breweryCostWithDiscount;
+
+        require(breweryAmount > 0, "Not enough rewards to compound");
+
+        uint256 meadAmount = breweryAmount * breweryCostWithDiscount;
+
+        // Mint logic
+        IERC20Upgradeable(settings.mead()).safeTransferFrom(msg.sender, settings.tavernsKeep(), meadAmount * settings.treasuryFee() / settings.PRECISION());
+        IERC20Upgradeable(settings.mead()).safeTransferFrom(msg.sender, settings.rewardsPool(), meadAmount * settings.rewardPoolFee() / settings.PRECISION());
+
+        // Mint logic
+        for (uint256 i = 0; i < breweryAmount; ++i) {
+            _mint(msg.sender, "", settings.reputationForMead());
+        }
+    }
+
+    /**
      * @notice Converts staked LPs into BREWERYs
      */
     function convertStakeIntoBrewerys(address stakingAddress, uint256 stakeAmount) external {
         TavernStaking staking = TavernStaking(stakingAddress);
         (uint256 amount,,,uint256 lastTimeDeposited) = staking.userInfo(msg.sender);
         require(stakeAmount <= amount, "You havent staked this amount");
-        require(lastTimeDeposited + conversionPeriodRequirement < block.timestamp, "Need to stake for longer to convert");
+        require(lastTimeDeposited + conversionPeriodRequirement <= block.timestamp, "Need to stake for longer to convert");
 
         // Attempt to withdraw the stake via the staking contract
         // This gives msg.sender LP tokens + MEAD rewards
         TavernStaking(stakingAddress).withdraw(msg.sender, stakeAmount);
 
         // Calculate how many BREWERYs this affords
-        uint256 lpPrice = getUSDCForOneLP();
-        uint256 fullLPValueUSDC = stakeAmount * lpPrice;
-        uint256 costOfOneBrewery = _getBreweryCostWithLPDiscount(1);
-        costOfOneBrewery = costOfOneBrewery - costOfOneBrewery * conversionDiscount / 1e4;
+        // stakeAmount         100 000000000000000000
+        // lpPriceUSD          100 000000
+        // stakeAmountUSD      100 000000
+        uint256 lpPriceUSD = getUSDCForOneLP(); // 100 000000
+        uint256 stakeAmountUSD = stakeAmount * lpPriceUSD / settings.liquidityPair().decimals();
+        uint256 breweryCostUSD = getBreweryCostWithLPAndConvertDiscount(1);
+        uint256 breweryAmount = stakeAmountUSD / breweryCostUSD;
 
-        uint256 breweryAmount = fullLPValueUSDC / costOfOneBrewery;
+        // Send the LP tokens from the account transacting this function to the taverns keep
+        // as payment. The rest is then kept on the person (dust)
+        uint256 toPayLP = breweryAmount * breweryCostUSD / lpPriceUSD;
+        settings.liquidityPair().transferFrom(msg.sender, settings.tavernsKeep(), toPayLP);
 
-        uint256 toPay = breweryAmount * costOfOneBrewery / lpPrice;
-
-        // Send the tokens from the account transacting this function to the taverns keep
-        settings.liquidityPair().transferFrom(msg.sender, settings.tavernsKeep(), toPay);
-
-        // Mint logic
-        purchaseWithLP(breweryAmount);
+        // Mint `breweryAmount`
+        for (uint256 i = 0; i < breweryAmount; ++i) {
+            _mint(msg.sender, "", settings.reputationForLP());
+        }
     }
 
     /**
@@ -241,7 +288,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
     function getBreweryAmountFromLP(uint256 amount) public view returns (uint256) {
         uint256 lpPrice = getUSDCForOneLP();
         uint256 lpValue = amount * lpPrice;
-        uint256 costOfOneBrewery = _getBreweryCostWithLPDiscount(1);
+        uint256 costOfOneBrewery = getBreweryCostWithLPDiscount(1);
         return lpValue / costOfOneBrewery;
     }
 
@@ -271,9 +318,6 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         IERC20Upgradeable(settings.usdc()).approve(address(settings.dexRouter()), amounts[0]);
         IERC20Upgradeable(settings.mead()).approve(address(settings.dexRouter()), amounts[1]);
 
-        uint256 amount0Min = amounts[0] - amounts[0] * zapSlippage / 1e4;
-        uint256 amount1Min = amounts[1] - amounts[1] * zapSlippage / 1e4;
-
         // Add liquidity (MEAD + USDC) to receive LP tokens
         (, , uint liquidity) = settings.dexRouter().addLiquidity(
             settings.usdc(),
@@ -287,6 +331,27 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         );
 
         return liquidity;
+    }
+
+    /**
+     * @notice Unzaps the liquidity
+     * @return The liquidity token balance
+     */
+    function unzapLiquidity(uint256 _amount) public returns (uint256, uint256) {
+        // Approve the router to spend these tokens 
+        //IERC20Upgradeable(settings.usdc()).approve(address(settings.dexRouter()), type(uint256).max);
+        //IERC20Upgradeable(settings.mead()).approve(address(settings.dexRouter()), type(uint256).max);
+
+        // Remove liquidity (MEAD + USDC) to receive LP tokens
+        return settings.dexRouter().removeLiquidity(
+            settings.usdc(),
+            settings.mead(),
+            _amount,
+            0,
+            0,
+            msg.sender,
+            block.timestamp + 120
+        );
     }
 
     function getMeadSupply() public view returns (uint256) {
