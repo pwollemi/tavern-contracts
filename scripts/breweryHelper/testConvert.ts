@@ -16,7 +16,7 @@ async function main() {
     const usdc = await ethers.getContractAt(ERC20, USDC_MAINNET);
     const classManager = await ethers.getContractAt("ClassManager", ClassManager_address);
     
-    const breweryHelperAddress = '0xC258397b6347A663314477d56419B274a0488a32'; // BreweryHelper_address
+    const breweryHelperAddress = BreweryHelper_address
 
     const Staking = await ethers.getContractAt("TavernStaking", STAKING_ADDRESS);
     const BreweryHelper = await ethers.getContractAt("BreweryPurchaseHelper", breweryHelperAddress);
