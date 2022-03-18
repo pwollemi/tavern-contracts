@@ -16,9 +16,9 @@ async function main() {
     const Settings = await ethers.getContractAt("TavernSettings", settings_address)
     const Renovation = await ethers.getContractAt("Renovation", await Settings.renovationAddress());
 
-    const count = 5;
+    const count = 1;
     for (let i = 0; i < count; ++i) {
-        let tx = await Renovation.create("0xd6E76ef57c1e21Bc1Ba58a19806f463C3a27970F", 3, 6, "");
+        let tx = await Renovation.create("0x8b2cd5f5063432a40365a131116cead80c834a91", 0, 11000, "");
         await tx.wait();
     }
 }

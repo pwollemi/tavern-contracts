@@ -260,7 +260,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
 
         // Attempt to withdraw the stake via the staking contract
         // This gives msg.sender LP tokens + MEAD rewards
-        TavernStaking(stakingAddress).withdraw(msg.sender, stakeAmount);
+        TavernStaking(stakingAddress).withdrawOnBehalf(msg.sender, stakeAmount);
 
         // Calculate how many BREWERYs this affords
         // stakeAmount         100 000000000000000000

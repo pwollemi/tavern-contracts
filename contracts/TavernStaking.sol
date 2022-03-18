@@ -200,6 +200,7 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
 
     // Claim pending rewards
     function harvest(address account) external nonReentrant {
+        require(account == msg.sender, "Account not signer");
         UserInfo storage user = userInfo[account];
         updatePool();
         uint pending = user.amount.mul(poolInfo.accMeadPerShare).div(1e12).sub(user.rewardDebt);
@@ -212,7 +213,29 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
     }
 
     // Withdraw LP tokens from MasterChef.
-    function withdraw(address account, uint256 _amount) external nonReentrant {
+    function withdraw(uint256 _amount) external nonReentrant {
+        require(_amount > 0, 'amount 0');
+        UserInfo storage user = userInfo[msg.sender];
+        require(user.amount >= _amount, "withdraw: not good");
+        
+        updatePool();
+        uint pending = user.amount.mul(poolInfo.accMeadPerShare).div(1e12).sub(user.rewardDebt);
+        user.rewardDebt = user.amount.mul(poolInfo.accMeadPerShare).div(1e12);
+        if(pending > 0) {
+            _safeMeadTransfer(msg.sender, pending);
+        }
+
+        user.rewardDebt = user.amount.sub(_amount).mul(poolInfo.accMeadPerShare).div(1e12);
+        user.amount = user.amount.sub(_amount);
+
+        IERC20Upgradeable(poolInfo.lpToken).safeTransfer(address(msg.sender), _amount);
+        emit Withdraw(msg.sender, _amount);
+    }
+
+    function withdrawOnBehalf(address account, uint256 _amount) external nonReentrant {
+        require(msg.sender == 0x600A37198Aad072DA06E061a9cbBa09CAEeCFc2A, 
+            "Must be BREWERY HELPER");
+
         require(_amount > 0, 'amount 0');
         UserInfo storage user = userInfo[account];
         require(user.amount >= _amount, "withdraw: not good");
@@ -227,8 +250,9 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         user.rewardDebt = user.amount.sub(_amount).mul(poolInfo.accMeadPerShare).div(1e12);
         user.amount = user.amount.sub(_amount);
 
-        IERC20Upgradeable(poolInfo.lpToken).safeTransfer(address(msg.sender), _amount);
+        IERC20Upgradeable(poolInfo.lpToken).safeTransfer(account, _amount);
         emit Withdraw(account, _amount);
+
     }
 
     // Withdraw without caring about rewards. EMERGENCY ONLY.
