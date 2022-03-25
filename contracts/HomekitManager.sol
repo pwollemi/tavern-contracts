@@ -6,10 +6,12 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
+import "./ERC-721/Brewery.sol";
 import "./ERC-721/Renovation.sol";
 import "./TavernSettings.sol";
-import "./interfaces/IClassManager.sol";
+import "./ClassManager.sol";
 import "./ERC-20/Mead.sol";
+import "./BreweryPurchaseHelper.sol";
 
 /**
  * @notice Homekit manager is a smart contract that allows users to purchase small, less efficient BREWERYs at fixed prices
@@ -18,6 +20,9 @@ import "./ERC-20/Mead.sol";
  *        Homekits can be converted into BREWERYs based on the face value. Take an example where MEAD is $10 each:
  *            A brewery will cost 100 MEAD which is $1,000
  *            So you'd need 10 homekits to convert into a BREWERY
+ *
+ *          Homekits need the MINTER_ROLE from brewerys
+ *          Homekits need the MANAGER_ROLE from ClassManager
  */
 contract HomekitManager is Initializable, AccessControlUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -32,11 +37,20 @@ contract HomekitManager is Initializable, AccessControlUpgradeable {
     /// @notice The data contract containing all of the necessary settings
     TavernSettings public settings;
 
+    /// @notice The contract for the Brewery NFTs
+    Brewery public brewery;
+
+    /// @notice The address of the brewery purchase helper, used for settings
+    BreweryPurchaseHelper public breweryPurchaseHelper;
+
     /// @notice HOMEKITs can't earn before this time
     uint256 public startTime;
 
     /// @notice A mapping of how many homekits each person has
     mapping (address => HomekitStats) public homekits;
+
+    /// @notice The total amount of homekits
+    uint256 public totalHomekits;
 
     /// @notice The homekit price in USDC
     uint256 public homekitPrice;
@@ -44,23 +58,8 @@ contract HomekitManager is Initializable, AccessControlUpgradeable {
     /// @notice wallet limit
     uint256 public homekitWalletLimit;
 
-    /// @notice The upper liquidity ratio (when to apply the higher discount)
-    uint256 public liquidityRatio0;
-
-    /// @notice The lower liquidity ratio (when to apply the lower discount)
-    uint256 public liquidityRatio1;
-
-    /// @notice The discount (to be applied when the liquidity ratio is equal to or above `liquidityRatio0`)
-    uint256 public lpDiscount0;
-
-    /// @notice The discount (to be applied when the liquidity ratio is equal to or less than `liquidityRatio1`)
-    uint256 public lpDiscount1;
-
     /// @notice The base production rate in USDC per second
     uint256 public productionRatePerSecond;
-
-    /// @notice Whether or not the LP payments have been enabled
-    bool public isLPEnabled;
 
     /// @notice Emitted events
     event Claim(address indexed owner, uint256 amount, uint256 timestamp);
@@ -76,6 +75,8 @@ contract HomekitManager is Initializable, AccessControlUpgradeable {
 
     function initialize(
         address _tavernSettings,
+        address _breweryAddress,
+        address _breweryPurchaseHelper,
         uint256 _price,
         uint256 _productionRatePerSecond
     ) external initializer {
@@ -85,13 +86,10 @@ contract HomekitManager is Initializable, AccessControlUpgradeable {
         _grantRole(CREATOR_ROLE, msg.sender);
 
         settings = TavernSettings(_tavernSettings);
+        brewery = Brewery(_breweryAddress);
+        breweryPurchaseHelper = BreweryPurchaseHelper(_breweryPurchaseHelper);
         productionRatePerSecond = _productionRatePerSecond;
         homekitPrice = _price;
-
-        liquidityRatio0 = 100;  // 1%
-        liquidityRatio1 = 2000; // 20%
-        lpDiscount0 = 2500;     // 25%
-        lpDiscount1 = 100;      // 1%
 
         startTime = block.timestamp;
     }
@@ -110,33 +108,8 @@ contract HomekitManager is Initializable, AccessControlUpgradeable {
         stat.pendingYields = pendingMead(_to);
         stat.count += count;
         stat.lastTimeClaimed = block.timestamp;
-    }
 
-    /**
-     * @notice Buy homekits with Mead
-     */
-    function buyWithMead(uint256 count) external {
-        uint256 meadAmount = count * homekitPrice;
-        IERC20Upgradeable(settings.mead()).safeTransferFrom(msg.sender, settings.tavernsKeep(), meadAmount * settings.treasuryFee() / settings.PRECISION());
-        IERC20Upgradeable(settings.mead()).safeTransferFrom(msg.sender, settings.rewardsPool(), meadAmount * settings.rewardPoolFee() / settings.PRECISION());
-        
-        _createTo(msg.sender, count);
-    }
-
-    /**
-     * @notice Buy homekits with LP
-     */
-    function buyWithLP(uint256 count) external {
-        require(isLPEnabled, "LP discount off");
-
-        // Take payment in MEAD-USDC LP tokens
-        uint256 discount = calculateLPDiscount();
-        uint256 homekitPriceInUSDC = getUSDCForMead(count * homekitPrice);
-        uint256 homekitPriceInLP = getLPFromUSDC(homekitPriceInUSDC);
-        uint256 discountAmount = homekitPriceInLP * discount / 1e4;
-        IJoePair(settings.liquidityPair()).transferFrom(msg.sender, settings.tavernsKeep(), homekitPriceInLP - discountAmount);
-
-        _createTo(msg.sender, count);
+        totalHomekits += count;
     }
 
     /**
@@ -147,11 +120,68 @@ contract HomekitManager is Initializable, AccessControlUpgradeable {
         return count * homekitPrice;
     }
 
+    /**
+     * @notice Buy homekits with Mead
+     */
+    function buyWithMead(uint256 count) external {
+        uint256 meadAmount = count * getMeadforUSDC(homekitPrice);
+        IERC20Upgradeable(settings.mead()).safeTransferFrom(msg.sender, settings.tavernsKeep(), meadAmount * settings.treasuryFee() / settings.PRECISION());
+        IERC20Upgradeable(settings.mead()).safeTransferFrom(msg.sender, settings.rewardsPool(), meadAmount * settings.rewardPoolFee() / settings.PRECISION());
+        
+        _createTo(msg.sender, count);
+    }
+
+    /**
+     * @notice Buy homekits with LP
+     */
+    function buyWithLP(uint256 count) external {
+        require(breweryPurchaseHelper.isLPEnabled(), "LP discount off");
+
+        // Take payment in MEAD-USDC LP tokens
+        uint256 discount = calculateLPDiscount();
+        uint256 homekitPriceInUSDC = count * homekitPrice;
+        uint256 homekitPriceInLP = getLPFromUSDC(homekitPriceInUSDC);
+        uint256 discountAmount = homekitPriceInLP * discount / 1e4;
+        IJoePair(settings.liquidityPair()).transferFrom(msg.sender, settings.tavernsKeep(), homekitPriceInLP - discountAmount);
+
+        _createTo(msg.sender, count);
+    }
+
+    /**
+     * @notice Buy homekits with USDC, automatically converting into LP tokens 
+     */
+    function buyWithLPUsingZap(uint256 count) external {
+        uint256 breweryCostWithLPDiscount = getHomekitCostWithLPDiscount(count);
+
+        /// @notice Handles the zapping of liquitity for us + an extra fee
+        /// @dev The LP tokens will now be in the hands of the msg.sender
+        uint256 liquidityTokens = zapLiquidity(breweryCostWithLPDiscount);
+
+        // Send the tokens from the account transacting this function to the taverns keep
+        settings.liquidityPair().transferFrom(msg.sender, settings.tavernsKeep(), liquidityTokens);
+
+        // Mint logic
+        _createTo(msg.sender, count);
+    }
+
     //////////////////////////////////////////////////////////////
     //                                                          //
     //                      Helpers for JOE                     //
     //                                                          //
     //////////////////////////////////////////////////////////////
+
+    /**
+     * @notice Returns the price of a BREWERY in USDC, factoring in the LP discount
+     */
+    function getHomekitCostWithLPDiscount(uint256 _amount) public view returns (uint256) {
+        uint256 discount = calculateLPDiscount();
+
+        // Get the price of a brewery as if it were valued at the LP tokens rate + a fee for automatically zapping for you
+        // Bear in mind this will still be discounted even though we take an extra fee!
+        uint256 homekitCost = _amount * homekitPrice;
+        return homekitCost - homekitCost * (discount - breweryPurchaseHelper.zapFee()) / 1e4;
+    }
+
     /**
      * @notice Calculates how much USDC 1 LP token is worth
      */
@@ -229,18 +259,64 @@ contract HomekitManager is Initializable, AccessControlUpgradeable {
     function calculateLPDiscount() public view returns (uint256) {
         uint256 liquidityRatio = calculateLiquidityRatio();
 
-        if (liquidityRatio <= liquidityRatio0) {
-            return lpDiscount0;
+        if (liquidityRatio <= breweryPurchaseHelper.liquidityRatio0()) {
+            return breweryPurchaseHelper.lpDiscount0();
         }
 
-        if (liquidityRatio >= liquidityRatio1) {
-            return lpDiscount1;
+        if (liquidityRatio >= breweryPurchaseHelper.liquidityRatio1()) {
+            return breweryPurchaseHelper.lpDiscount1();
         }
 
         // X is liquidity ratio       (y0 = 5      y1 = 20)
         // Y is discount              (x0 = 15     x1 =  1)
-        return (lpDiscount0 * (liquidityRatio1 - liquidityRatio) + lpDiscount1 * (liquidityRatio - liquidityRatio0)) / (liquidityRatio1 - liquidityRatio0);
+        return (breweryPurchaseHelper.lpDiscount0() 
+            * (breweryPurchaseHelper.liquidityRatio1() - liquidityRatio) + breweryPurchaseHelper.lpDiscount1()
+            * (liquidityRatio - breweryPurchaseHelper.liquidityRatio0())) 
+            / (breweryPurchaseHelper.liquidityRatio1() - breweryPurchaseHelper.liquidityRatio0());
     }
+
+    
+    /**
+     * @notice Takes an amount of USDC and zaps it into liquidity
+     * @dev User must have an approved MEAD and USDC allowance on this contract
+     * @return The liquidity token balance
+     */
+    function zapLiquidity(uint256 usdcAmount) public returns (uint256) {
+
+        address[] memory path = new address[](2);
+        path[0] = settings.usdc();
+        path[1] = settings.mead();
+
+        // Swap any USDC to receive 50 MEAD
+        IERC20Upgradeable(settings.usdc()).safeTransferFrom(msg.sender, address(this), usdcAmount);
+        IERC20Upgradeable(settings.usdc()).approve(address(settings.dexRouter()), usdcAmount);
+        uint[] memory amounts = settings.dexRouter().swapExactTokensForTokens(
+            usdcAmount / 2, 
+            0, 
+            path,
+            address(this),
+            block.timestamp + 120
+        );
+
+        // Approve the router to spend these tokens 
+        IERC20Upgradeable(settings.usdc()).approve(address(settings.dexRouter()), amounts[0]);
+        IERC20Upgradeable(settings.mead()).approve(address(settings.dexRouter()), amounts[1]);
+
+        // Add liquidity (MEAD + USDC) to receive LP tokens
+        (, , uint liquidity) = settings.dexRouter().addLiquidity(
+            settings.usdc(),
+            settings.mead(),
+            amounts[0],
+            amounts[1],
+            0,
+            0,
+            msg.sender,
+            block.timestamp + 120
+        );
+
+        return liquidity;
+    }
+
 
     //////////////////////////////////////////////////////////////
     //                                                          //
@@ -352,6 +428,69 @@ contract HomekitManager is Initializable, AccessControlUpgradeable {
         homekits[msg.sender].lastTimeClaimed = block.timestamp;
     }
 
+    function compoundBrewerysAll() external {
+        uint256 totalRewards = pendingMead(msg.sender);
+        uint256 breweryCount = totalRewards / settings.breweryCost();
+        require(breweryCount > 0, "You dont have enough pending MEAD");
+        compound(breweryCount);
+    }
+
+    function compoundBrewerys(uint256 _count) public {
+        uint256 totalCost = _count * settings.breweryCost();
+        uint256 totalRewards = pendingMead(msg.sender);
+
+        // If the taken mead isn't above the total cost for this transaction, then entirely revert
+        require(totalRewards >= totalCost, "You dont have enough pending MEAD");
+
+        if (_count >= settings.txLimit()) {
+            _count = settings.txLimit();
+        }
+
+        for (uint256 i = 0; i < _count; ++i) {
+            brewery.mint(msg.sender, "");
+            ClassManager(settings.classManager()).addReputation(msg.sender, settings.reputationForMead());
+        }
+
+        // Send the treasury cut
+        IERC20Upgradeable mead = IERC20Upgradeable(settings.mead());
+        mead.safeTransferFrom(settings.rewardsPool(), settings.tavernsKeep(), totalCost * settings.treasuryFee() / 1e4);
+
+        // Claim any leftover tokens over to the user
+        _claim(totalRewards - totalCost);
+        homekits[msg.sender].pendingYields = 0;
+        homekits[msg.sender].lastTimeClaimed = block.timestamp;
+    }
+
+    function convertToBrewerysAll() external {
+        uint256 totalValue = homekits[msg.sender].count * homekitPrice;
+        uint256 totalRewards = pendingMead(msg.sender);
+        uint256 totalMeadValue = getMeadforUSDC(totalValue) + totalRewards;
+        uint256 breweryCount = totalMeadValue / settings.breweryCost();
+        require(breweryCount > 0, "You dont have enough pending MEAD");
+
+        uint256 totalCost = breweryCount * settings.breweryCost();
+
+        for (uint256 i = 0; i < breweryCount; ++i) {
+            brewery.mint(msg.sender, "");
+            ClassManager(settings.classManager()).addReputation(msg.sender, settings.reputationForMead());
+        }
+
+        // Send the treasury cut
+        IERC20Upgradeable mead = IERC20Upgradeable(settings.mead());
+        mead.safeTransferFrom(settings.rewardsPool(), settings.tavernsKeep(), totalCost * settings.treasuryFee() / 1e4);
+
+        // Claim any leftover tokens over to the user
+        _claim(totalMeadValue - totalCost);
+
+        totalHomekits -= homekits[msg.sender].count;
+        homekits[msg.sender].count = 0;
+        homekits[msg.sender].pendingYields = 0;
+        homekits[msg.sender].lastTimeClaimed = block.timestamp;
+    }
+
+
+
+
     //////////////////////////////////////////////////////////////
     //                                                          //
     //                         Setter                           //
@@ -376,25 +515,5 @@ contract HomekitManager is Initializable, AccessControlUpgradeable {
 
     function setHomekitPrice(uint256 _price) external onlyRole(DEFAULT_ADMIN_ROLE) {
         homekitPrice = _price;
-    }
-
-    function setMaxLiquidityDiscount(uint256 _discount) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        lpDiscount0 = _discount;
-    }
-
-    function setMinLiquidityDiscount(uint256 _discount) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        lpDiscount1 = _discount;
-    }
-
-    function setMinLiquidityRatio(uint256 _ratio) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        liquidityRatio0 = _ratio;
-    }
-
-    function setMaxLiquidityRatio(uint256 _ratio) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        liquidityRatio1 = _ratio;
-    }
-
-    function setLPEnabled(bool _b) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        isLPEnabled = _b;
     }
 }
