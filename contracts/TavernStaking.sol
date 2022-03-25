@@ -181,11 +181,11 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
     }
 
     // Deposit LP tokens to MasterChef for MEAD allocation.
-    function deposit(address account, uint256 _amount) public nonReentrant {
-        UserInfo storage user = userInfo[account];
+    function deposit(uint256 _amount) public nonReentrant {
+        UserInfo storage user = userInfo[msg.sender];
         updatePool();
         IERC20Upgradeable(poolInfo.lpToken).safeTransferFrom(
-            account,
+            msg.sender,
             address(this),
             _amount
         );
@@ -195,7 +195,7 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         }
         user.lastTimeDeposited = block.timestamp;
         user.rewardDebt = _amount.mul(poolInfo.accMeadPerShare).div(1e12).add(user.rewardDebt);
-        emit Deposit(account, _amount);
+        emit Deposit(msg.sender, _amount);
     }
 
     // Claim pending rewards
@@ -227,6 +227,8 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
 
         user.rewardDebt = user.amount.sub(_amount).mul(poolInfo.accMeadPerShare).div(1e12);
         user.amount = user.amount.sub(_amount);
+
+        ClassManager(classManager).addReputation(msg.sender)
 
         IERC20Upgradeable(poolInfo.lpToken).safeTransfer(address(msg.sender), _amount);
         emit Withdraw(msg.sender, _amount);
