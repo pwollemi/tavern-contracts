@@ -81,9 +81,6 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
     /// @notice The control variable to increase experience gain
     uint256 public globalExperienceMultiplier;
 
-    /// @notice Timestamp of the last claimed time of the user
-    mapping(address => uint256) public globalLastClaimedAt;
-
     /// @notice Emitted events
     event Claim(address indexed owner, uint256 tokenId, uint256 amount, uint256 timestamp);
     event LevelUp(address indexed owner, uint256 tokenId, uint256 tier, uint256 xp, uint256 timestamp);
@@ -103,8 +100,8 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
     /// @notice The total amount of breweries (totalSupply cant go over this)
     uint256 public maxBreweries;
 
-    /// @notice The last time this user claimed
-    mapping(address => uint256) lastTimeClaimed;
+    /// @notice Timestamp of the last claimed time of the user
+    mapping(address => uint256) public globalLastClaimedAt;
 
     function initialize(
         address _tavernSettings,
@@ -469,13 +466,6 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
         IERC20Upgradeable mead = IERC20Upgradeable(settings.mead());
         mead.safeTransferFrom(settings.rewardsPool(), msg.sender, rewardAmount);
         mead.safeTransferFrom(settings.rewardsPool(), settings.tavernsKeep(), treasuryAmount);
-
-        if (lastTimeClaimed[msg.sender] + fermentationPeriod <= block.timestamp) {
-            uint256 daysNotClaimed = (block.timestamp - lastTimeClaimed[msg.sender] - fermentationPeriod) / 1 days;
-            ClassManager.addReputation(msg.sender, 20 * daysNotClaimed);
-        }
-
-        lastTimeClaimed[msg.sender] = block.timestamp;
     }
 
     /**
@@ -730,8 +720,10 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
      * ================================================================
      */
     function _afterTokenTransfer(address from, address to, uint256 tokenId) internal override {
-        if (balanceOf(from) == 0) {
-            globalLastClaimedAt[from] = 0;
+        if(from != address(0)) {
+            if (balanceOf(from) == 0) {
+                globalLastClaimedAt[from] = 0;
+            }
         }
         if (balanceOf(to) > 0 && globalLastClaimedAt[to] == 0) {
             globalLastClaimedAt[to] = block.timestamp;

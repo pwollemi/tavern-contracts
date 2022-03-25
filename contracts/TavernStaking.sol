@@ -228,8 +228,6 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         user.rewardDebt = user.amount.sub(_amount).mul(poolInfo.accMeadPerShare).div(1e12);
         user.amount = user.amount.sub(_amount);
 
-        ClassManager(classManager).addReputation(msg.sender)
-
         IERC20Upgradeable(poolInfo.lpToken).safeTransfer(address(msg.sender), _amount);
         emit Withdraw(msg.sender, _amount);
     }
@@ -275,6 +273,12 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
             IERC20(mead).transfer(_to, _amount);
         }
     }
+
+    // function _reputationForLpAmount(uint256 _amount) internal {
+    //     uint256 lpAmountFor1000 = 1000 / BreweryPurchaseHelper(breweryPurchaseHelper).getUSDCForOneLP();
+    //     uint256 reputation = (50 * _amount) / lpAmountFor1000;
+    //     ClassManager(settings.classManager()).removeReputation(msg.sender, reputation);
+    // }
 
     function setStartBlock(uint256 _start) external onlyOwner {
         startBlock = _start;
