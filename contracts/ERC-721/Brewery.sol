@@ -81,6 +81,9 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
     /// @notice The control variable to increase experience gain
     uint256 public globalExperienceMultiplier;
 
+    /// @notice Timestamp of the last claimed time of the user
+    mapping(address => uint256) public globalLastClaimedAt;
+
     /// @notice Emitted events
     event Claim(address indexed owner, uint256 tokenId, uint256 amount, uint256 timestamp);
     event LevelUp(address indexed owner, uint256 tokenId, uint256 tier, uint256 xp, uint256 timestamp);
@@ -439,6 +442,21 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
     }
 
     /**
+     * @notice Adds reputation for claim
+     */
+    function _calculateReputation() internal {
+        uint256 lastClaimedAt = globalLastClaimedAt[msg.sender];
+        uint256 fermentationEnd = lastClaimedAt + fermentationPeriod;
+        globalLastClaimedAt[msg.sender] = block.timestamp;
+        if (lastClaimedAt == 0 || fermentationEnd >= block.timestamp) {
+            return;
+        }
+        uint256 repPeriod = block.timestamp - fermentationEnd;
+        uint256 newReputation = repPeriod * settings.reputationForClaimPerDay() / 86400;
+        ClassManager(settings.classManager()).addReputation(msg.sender, newReputation);
+    }
+
+    /**
      * @notice Handles the specific claiming of MEAD and distributing it to the rewards pool and the treasury
      */
     function _claim(uint256 amount) internal {
@@ -478,6 +496,7 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
         }
 
         _calculateXp(_tokenId);
+        _calculateReputation();
 
         // Reset the claim timer so that individuals have to wait past the fermentation period again
         breweryStats[_tokenId].lastTimeClaimed = block.timestamp;
@@ -703,5 +722,20 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
 
     function setMaxBreweries(uint256 maxLimit) external onlyRole(DEFAULT_ADMIN_ROLE) {
         maxBreweries = maxLimit;
+    }
+
+    /**
+     * ================================================================
+     *                   HOOK
+     * ================================================================
+     */
+    function _afterTokenTransfer(address from, address to, uint256 tokenId) internal override {
+        if (balanceOf(from) == 0) {
+            globalLastClaimedAt[from] = 0;
+        }
+        if (balanceOf(to) > 0 && globalLastClaimedAt[to] == 0) {
+            globalLastClaimedAt[to] = block.timestamp;
+        }
+        super._afterTokenTransfer(from, to, tokenId);
     }
 }

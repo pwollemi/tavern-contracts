@@ -78,6 +78,9 @@ contract TavernSettings is Initializable, OwnableUpgradeable {
     /// @notice The amount of reputation gained for buying a BREWERY with LP tokens
     uint256 public reputationForLP;
 
+    /// @notice The amount of reputation gained for every day the person didn't claim past the fermentation period
+    uint256 public reputationForClaimPerDay;
+
     function initialize(
         address _xmead, 
         address _mead, 
@@ -197,5 +200,9 @@ contract TavernSettings is Initializable, OwnableUpgradeable {
 
     function setReputationForLP(uint256 _amount) external onlyOwner {
         reputationForLP = _amount;
+    }
+
+    function setReputationForClaimPerDay(uint256 _amount) external onlyOwner {
+        reputationForClaimPerDay = _amount;
     }
 }
