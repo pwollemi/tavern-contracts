@@ -6,7 +6,7 @@ async function main() {
     const [deployer] = await ethers.getSigners();
 
     let addresses = [
-        BreweryHelper_address,
+        '0x145d729EAe53DEA212cE970558D6Eb1846D15d20',
     ]
 
     const Mead = await ethers.getContractAt("Mead", Mead_address);
