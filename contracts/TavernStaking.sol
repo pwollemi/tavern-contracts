@@ -203,7 +203,7 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         user.rewardDebt = _amount.mul(poolInfo.accMeadPerShare).div(1e12).add(user.rewardDebt);
         emit Deposit(account, _amount);
 
-        uint256 newReputation = settings.reputationPerStakingLP() * _amount / (10 ** ERC20Upgradeable(poolInfo.lpToken).decimals());
+        uint256 newReputation = settings.reputationPerStakingLP() * _amount / (10 ** ERC20Upgradeable(poolInfo.lpToken).decimals()) / (10 ** settings.PRECISION());
         ClassManager(settings.classManager()).addReputation(account, newReputation);
     }
 
