@@ -22,38 +22,7 @@ async function main() {
     const BreweryHelper = await ethers.getContractAt("BreweryPurchaseHelper", '0xA3d66fa0140260217F7781793CcDE3b030B58258');
 
 
-    let tx = await BreweryHelper.setConversionDiscount(1000);
-    await tx.wait();
-
-    tx = await BreweryHelper.setConversionPeriodRequirement(86400 * 3);
-    await tx.wait();
-
-    // const lpDiscount = await BreweryHelper.calculateLPDiscount();
-    // const precision = await settings.PRECISION();
-    // const zapFee = await BreweryHelper.zapFee();
-    // const discountMultiplier = precision.sub(lpDiscount).div(precision);
-    // const zapFeeMultiplier = precision.add(zapFee).div(precision);
-    // const breweryPrice = await BreweryHelper.getUSDCForMead(await settings.breweryCost());
-    // const discount = breweryPrice.mul(lpDiscount).div(1e4);
-    // const discountWithZap = breweryPrice.mul(lpDiscount.sub(zapFee)).div(1e4);;
-    // console.log("Zap Multiplier", ethers.utils.formatUnits(zapFeeMultiplier, 2));
-    // console.log("Brewery Price", ethers.utils.formatUnits(breweryPrice, 6));
-    // console.log("Brewery Price w/ LP discount", ethers.utils.formatUnits(breweryPrice.sub(discount), 6));
-    // console.log("Brewery Price w/ LP discount + zap", ethers.utils.formatUnits(breweryPrice.sub(discountWithZap), 6));
-    // console.log("\n-- Before --")
-    // console.log("USDC Balance Before", ethers.utils.formatUnits(await usdc.balanceOf(deployer.address), 6));
-    // console.log("LP Balance Before", ethers.utils.formatUnits(await lp.balanceOf(TreasuryAddress), 18));
-    // console.log("Brewery Balance Before", await brewery.balanceOf(deployer.address));
-
-    // console.log("-- Zapping ... --")
-    // await usdc.approve(BreweryHelper.address, ethers.constants.MaxUint256);
-    // await lp.approve(BreweryHelper.address, ethers.constants.MaxUint256);
-    // await BreweryHelper.purchaseWithLPUsingZap("");
-    
-    // console.log("-- After --")
-    // console.log("USDC Balance After", ethers.utils.formatUnits(await usdc.balanceOf(deployer.address), 6));
-    // console.log("LP Balance After", ethers.utils.formatUnits(await lp.balanceOf(TreasuryAddress), 18));
-    // console.log("Brewery Balance After", await brewery.balanceOf(deployer.address));
+    await brewery.setMaxBreweries(20000);
 }
 
 main()

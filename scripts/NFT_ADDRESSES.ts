@@ -9,3 +9,4 @@ export const RedeemHelper_address = '0x2f54fc9EF1B3a0259cC8DC5B1047edC2670F460E'
 export const RenovationHelper_address = '0xcE5754CE78EbeDDF2a3988c701c5BeFf3Ee673BA';
 export const BreweryHelper_address = '0x600A37198Aad072DA06E061a9cbBa09CAEeCFc2A';
 export const HomekitManager_address = '0xC46B6D27091A79552F7F6B64c94c8A57C21F5bcb';
+export const LIQUIDITY_POOL_ADDRESS = "0x295f322E3Cf883925aE8CC9346e4D2B19d7dCb0c";

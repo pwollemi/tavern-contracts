@@ -81,18 +81,10 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
     /// @notice The control variable to increase experience gain
     uint256 public globalExperienceMultiplier;
 
-    /// @notice Emitted events
-    event Claim(address indexed owner, uint256 tokenId, uint256 amount, uint256 timestamp);
-    event LevelUp(address indexed owner, uint256 tokenId, uint256 tier, uint256 xp, uint256 timestamp);
-
+<<<<<<< HEAD
+=======
     /// @notice The specific role to give to the Brewery Purchase Helper so it can mint BREWERYs
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-
-    /// @notice Modifier to test that the caller has a specific role (interface to AccessControl)
-    modifier isRole(bytes32 role) {
-        require(hasRole(role, msg.sender), "Incorrect role!");
-        _;
-    }
 
     /// @notice A mapping of which addresses are not allowed to trade or approve BREWERYs
     mapping (address => bool) public blacklist;
@@ -103,6 +95,29 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
     /// @notice Timestamp of the last claimed time of the user
     mapping(address => uint256) public globalLastClaimedAt;
 
+>>>>>>> 47b55b95c6e05dadcdf2c469e71eac44a7eadced
+    /// @notice Emitted events
+    event Claim(address indexed owner, uint256 tokenId, uint256 amount, uint256 timestamp);
+    event LevelUp(address indexed owner, uint256 tokenId, uint256 tier, uint256 xp, uint256 timestamp);
+
+    /// @notice Modifier to test that the caller has a specific role (interface to AccessControl)
+    modifier isRole(bytes32 role) {
+        require(hasRole(role, msg.sender), "Incorrect role!");
+        _;
+    }
+
+<<<<<<< HEAD
+    /// @notice A mapping of which addresses are not allowed to trade or approve BREWERYs
+    mapping (address => bool) public blacklist;
+
+    /// @notice The total amount of breweries (totalSupply cant go over this)
+    uint256 public maxBreweries;
+
+    /// @notice Timestamp of the last claimed time of the user
+    mapping(address => uint256) public globalLastClaimedAt;
+
+=======
+>>>>>>> 47b55b95c6e05dadcdf2c469e71eac44a7eadced
     function initialize(
         address _tavernSettings,
         uint256 _fermentationPeriod,
