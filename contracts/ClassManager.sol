@@ -76,7 +76,11 @@ contract ClassManager is Initializable, AccessControlUpgradeable, IClassManager 
     }
 
     function removeReputation(address _account, uint256 _amount) external isRole(MANAGER_ROLE) {
-        brewers[_account].reputation -= _amount;
+        if (brewers[_account].reputation < _amount) {
+            brewers[_account].reputation = 0;
+        } else {
+            brewers[_account].reputation -= _amount;
+        }
         _handleChange(_account);
     }
 

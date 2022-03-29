@@ -4,12 +4,16 @@ pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+
+import "./ClassManager.sol";
+import "./TavernSettings.sol";
 
 contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeMathUpgradeable for uint256;
@@ -58,6 +62,8 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
 
     uint256 public firstMultiplier;
     uint256 public secondMultiplier;
+
+    TavernSettings public settings;
 
     event Deposit(address indexed user, uint256 amount);
     event Withdraw(address indexed user, uint256 amount);
@@ -196,6 +202,9 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         user.lastTimeDeposited = block.timestamp;
         user.rewardDebt = _amount.mul(poolInfo.accMeadPerShare).div(1e12).add(user.rewardDebt);
         emit Deposit(msg.sender, _amount);
+
+        uint256 newReputation = settings.reputationPerStakingLP() * _amount / (10 ** ERC20Upgradeable(poolInfo.lpToken).decimals()) / (10 ** settings.PRECISION());
+        ClassManager(settings.classManager()).addReputation(msg.sender, newReputation);
     }
 
     // Claim pending rewards
@@ -230,6 +239,9 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
 
         IERC20Upgradeable(poolInfo.lpToken).safeTransfer(address(msg.sender), _amount);
         emit Withdraw(msg.sender, _amount);
+
+        uint256 newReputation = settings.reputationPerStakingLP() * _amount / (10 ** ERC20Upgradeable(poolInfo.lpToken).decimals());
+        ClassManager(settings.classManager()).removeReputation(msg.sender, newReputation);
     }
 
     function withdrawOnBehalf(address account, uint256 _amount) external nonReentrant {
@@ -253,11 +265,17 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         IERC20Upgradeable(poolInfo.lpToken).safeTransfer(account, _amount);
         emit Withdraw(account, _amount);
 
+        uint256 newReputation = settings.reputationPerStakingLP() * _amount / (10 ** ERC20Upgradeable(poolInfo.lpToken).decimals());
+        ClassManager(settings.classManager()).addReputation(account, newReputation);
     }
 
     // Withdraw without caring about rewards. EMERGENCY ONLY.
     function emergencyWithdraw(address account) public {
         UserInfo storage user = userInfo[account];
+
+        uint256 newReputation = settings.reputationPerStakingLP() * user.amount / (10 ** ERC20Upgradeable(poolInfo.lpToken).decimals());
+        ClassManager(settings.classManager()).removeReputation(account, newReputation);
+
         IERC20Upgradeable(poolInfo.lpToken).safeTransfer(address(msg.sender), user.amount);
         emit EmergencyWithdraw(account, user.amount);
         user.amount = 0;
@@ -307,5 +325,9 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
 
     function setPoolInfo(uint256 lastRewardTime) external onlyOwner {
         poolInfo.lastRewardBlock = lastRewardTime;
+    }
+
+    function setSettings(TavernSettings _settings) external onlyOwner {
+        settings = _settings;
     }
 }
