@@ -81,7 +81,7 @@ contract TavernSettings is Initializable, OwnableUpgradeable {
     /// @notice The amount of reputation gained for every day the person didn't claim past the fermentation period
     uint256 public reputationForClaimPerDay;
 
-    /// @notice The amount of reputation gained per LP token, ignore decimals
+    /// @notice The amount of reputation gained per LP token, ignore decimals, accuracy is PRECISION
     uint256 public reputationPerStakingLP;
 
     function initialize(
