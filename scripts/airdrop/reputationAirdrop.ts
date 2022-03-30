@@ -30,13 +30,17 @@ async function main() {
 
     const lpAmount = 1000 / lpPrice;
 
+    const reputationPerLP = Number(ethers.utils.parseUnits("250", 4));
+
     let txCount = await deployer.getTransactionCount();
     for (const [key, value] of Object.entries(StakingData)) {
         const amount = Number(ethers.utils.formatUnits(value, 18));
-        const reputation = 50 * amount / lpAmount;
-        console.log(`Airdropping ${key} (${amount} LP tokens - $${amount * lpPrice}): ${reputation} rep`)
-        //await ClassManager.addReputation(key, reputation, { nonce: txCount});
-        txCount++;
+        if (amount > 0) {
+            const reputation = Math.floor(amount * reputationPerLP);
+            console.log(`Airdropping ${key} (${amount} LP tokens - $${amount * lpPrice}): ${reputation} rep`)
+            await ClassManager.addReputation(key, reputation, { nonce: txCount});
+            txCount++;
+        }
     }
 }
 
