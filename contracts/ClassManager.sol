@@ -54,7 +54,7 @@ contract ClassManager is Initializable, AccessControlUpgradeable, IClassManager 
      */
     function _handleChange(address _account) internal {
         uint32 nextClass = 0;
-        for (uint32 i = 0; i < classThresholds.length - 1; ++i) {
+        for (uint32 i = 0; i < classThresholds.length; ++i) {
             if (brewers[_account].reputation >= classThresholds[i]) {
                 nextClass = i;
             } else {
@@ -90,7 +90,15 @@ contract ClassManager is Initializable, AccessControlUpgradeable, IClassManager 
     }
 
     function getClass(address _account) external view override returns (uint32) {
-        return brewers[_account].class;
+        uint32 nextClass = 0;
+        for (uint32 i = 0; i < classThresholds.length; ++i) {
+            if (brewers[_account].reputation >= classThresholds[i]) {
+                nextClass = i;
+            } else {
+                break;
+            }
+        }
+        return nextClass;
     }
 
     function getReputation(address _account) external view override returns (uint256) {
