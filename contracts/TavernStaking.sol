@@ -266,7 +266,7 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         emit Withdraw(account, _amount);
 
         uint256 newReputation = settings.reputationPerStakingLP() * _amount / (10 ** ERC20Upgradeable(poolInfo.lpToken).decimals());
-        ClassManager(settings.classManager()).addReputation(account, newReputation);
+        ClassManager(settings.classManager()).removeReputation(account, newReputation);
     }
 
     // Withdraw without caring about rewards. EMERGENCY ONLY.
