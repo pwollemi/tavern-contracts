@@ -25,6 +25,10 @@ async function main() {
     console.log("\twalletLimit", await settings.walletLimit());
     console.log("\tbreweryCost", await settings.breweryCost());
     console.log("\txMeadCost", await settings.xMeadCost());
+    console.log("\tTaxes 1", await settings.classTaxes(0))
+    console.log("\tTaxes 2", await settings.classTaxes(1))
+    console.log("\tTaxes 3", await settings.classTaxes(2))
+    console.log("\tTaxes 4", await settings.classTaxes(3))
 }
 
 main()
