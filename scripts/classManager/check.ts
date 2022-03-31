@@ -11,6 +11,8 @@ async function main() {
     const thresholds = await ClassManager.getClassThresholds();
     console.log(thresholds);
 
+    console.log("rep", await ClassManager.getReputation('0xa6d15819a524e209f3ebb5016b76ca78ce032eee'))
+    //await ClassManager.removeReputation('0xa6d15819a524e209f3ebb5016b76ca78ce032eee', '50000000000')
 }
 
 main()
