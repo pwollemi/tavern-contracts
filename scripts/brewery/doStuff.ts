@@ -22,7 +22,9 @@ async function main() {
     const BreweryHelper = await ethers.getContractAt("BreweryPurchaseHelper", '0xA3d66fa0140260217F7781793CcDE3b030B58258');
 
 
-    await brewery.setMaxBreweries(20000);
+    //await brewery.resetGlobalLastClaimed(deployer.address);
+
+    await ClassManager.grantRole(await ClassManager.MANAGER_ROLE(), Brewery_address);
 }
 
 main()
