@@ -1030,6 +1030,19 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "resetGlobalLastClaimed",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "bytes32",
         "name": "role",
         "type": "bytes32"
