@@ -442,15 +442,22 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
      * @notice Adds reputation for claim
      */
     function _calculateReputation() internal {
+        if (globalLastClaimedAt[msg.sender] == 0) {
+            globalLastClaimedAt[msg.sender] = startTime;
+        }
         uint256 lastClaimedAt = globalLastClaimedAt[msg.sender];
         uint256 fermentationEnd = lastClaimedAt + fermentationPeriod;
         globalLastClaimedAt[msg.sender] = block.timestamp;
-        if (lastClaimedAt == 0 || fermentationEnd >= block.timestamp) {
+        if (fermentationEnd >= block.timestamp) {
             return;
         }
         uint256 repPeriod = block.timestamp - fermentationEnd;
         uint256 newReputation = repPeriod * settings.reputationForClaimPerDay() / 86400;
         ClassManager(settings.classManager()).addReputation(msg.sender, newReputation);
+    }
+
+    function resetGlobalLastClaimed(address account) external {
+        globalLastClaimedAt[account] = 0;
     }
 
     /**
