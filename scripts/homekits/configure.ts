@@ -14,7 +14,9 @@ async function main() {
     
     //await HomekitManager.setHomekitWalletLimit(500);
 
-    const productionRate = ethers.utils.parseUnits("0.5", 6);
+    const productionRate = ethers.utils.parseUnits("75", 5).div(86400);
+    console.log("Prod. Rate:", productionRate);
+    return;
     await HomekitManager.setProductionRatePerSecond(productionRate.div(86400))
 }
 
