@@ -21,6 +21,14 @@ async function main() {
 
     // Add some test items
     let tx; 
+
+    const total = Number((await RenovationPurchaseHelper.totalItems()).toString());
+
+    let txCount = await deployer.getTransactionCount();
+    for(let i = 0; i < total; ++i) {
+      await RenovationPurchaseHelper.setSupply(i, 500, {nonce: txCount + i});
+    }
+
     // // Add Reinforced Vats (10 MEAD and 5% increased yield)
     // tx = await RenovationPurchaseHelper.addItem(ethers.utils.parseUnits("10", 18), 500, 0, 10500, "");
     // await tx.wait();
