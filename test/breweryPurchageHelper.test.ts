@@ -3,9 +3,9 @@ import hre, { ethers } from "hardhat";
 import { solidity } from "ethereum-waffle";
 import chai from 'chai';
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
-import { setNextBlockTimestamp, getLatestBlockTimestamp, mineBlock, latest, impersonateForToken, duration } from "../helper/utils";
+import { setNextBlockTimestamp, getLatestBlockTimestamp, mineBlock, latest, impersonateForToken, duration, getLatestBlockNumber } from "../helper/utils";
 import { deployContract, deployProxy } from "../helper/deployer";
-import { Brewery, BreweryPurchaseHelper, ClassManager, IERC20, IJoePair, IJoeRouter02, Mead, Renovation, TavernSettings, WhitelistPresale, XMead } from "../typechain";
+import { Brewery, BreweryPurchaseHelper, ClassManager, IERC20, IJoeFactory, IJoePair, IJoePair__factory, IJoeRouter02, Mead, Renovation, TavernSettings, TavernStaking, WhitelistPresale, XMead } from "../typechain";
 import { BigNumber } from "ethers";
 
 chai.use(solidity);
@@ -19,6 +19,7 @@ const USDC = {
 }
 
 const routerAddress = "0x60aE616a2155Ee3d9A68541Ba4544862310933d4";
+const factoryAddress = "0x9ad6c38be94206ca50bb0d90783181662f0cfa10";
 const initialSupply = ethers.utils.parseUnits("100000000", 18);
 
 describe('Brewery Purchase Helper', () => {
@@ -40,6 +41,7 @@ describe('Brewery Purchase Helper', () => {
   let settings: TavernSettings;
   let classManager: ClassManager;
   let purchaser: BreweryPurchaseHelper;
+  let staking: TavernStaking;
 
   const baseDailyYield = ethers.utils.parseUnits("2", 18);
   const baseFermentationPeriod = duration.days(14).toNumber();
@@ -74,6 +76,7 @@ describe('Brewery Purchase Helper', () => {
     await settings.setRewardsPool(rewardsPool.address);
     await settings.setTavernsKeep(tavernsKeep.address);
     await settings.setRedeemPool(redeemPool.address);
+    await settings.setTxLimit(walletLimit);
 
     await impersonateForToken(USDC, deployer, "1000000");
     await usdc.transfer(alice.address, ethers.utils.parseUnits("100000", USDC.decimals));
@@ -116,13 +119,14 @@ describe('Brewery Purchase Helper', () => {
     await brewery.addTier(tiers[0], yields[0]);
     await brewery.addTier(tiers[1], yields[1]);
     await brewery.addTier(tiers[2], yields[2]);
+    await brewery.setMaxBreweries(100000);
   });
 
   it("Purchase with XMead", async () => {
     const xMeadCost = await settings.xMeadCost();
     await xmead.issue(alice.address, xMeadCost);
 
-    await purchaser.connect(alice).purchaseWithXMead("test");
+    await purchaser.connect(alice).purchaseWithXMead(1);
     expect(await brewery.balanceOf(alice.address)).to.be.equal(1);
     expect(await xmead.balanceOf(alice.address)).to.be.equal(0);
   });
@@ -132,7 +136,7 @@ describe('Brewery Purchase Helper', () => {
     await mead.transfer(alice.address, meadCost);
     await mead.connect(alice).approve(purchaser.address, ethers.constants.MaxUint256);
 
-    await purchaser.connect(alice).purchaseWithMead("test");
+    await purchaser.connect(alice).purchaseWithMead(1);
     expect(await brewery.balanceOf(alice.address)).to.be.equal(1);
     expect(await mead.balanceOf(alice.address)).to.be.equal(0);
   });
@@ -147,7 +151,7 @@ describe('Brewery Purchase Helper', () => {
     const actualCost = usdcCost.mul(actualPercentage).div(1e4);
 
     const tavern0 = await usdc.balanceOf(tavernsKeep.address);
-    await purchaser.connect(alice).purchaseWithUSDC("test");
+    await purchaser.connect(alice).purchaseWithUSDC(1);
     const tavern1 = await usdc.balanceOf(tavernsKeep.address);
 
     expect(tavern1.sub(tavern0)).to.be.equal(actualCost);
@@ -167,25 +171,64 @@ describe('Brewery Purchase Helper', () => {
     await LP.transfer(alice.address, lpCost);
 
     const tavern0 = await LP.balanceOf(tavernsKeep.address);
-    await purchaser.connect(alice).purchaseWithLP("test");
+    await purchaser.connect(alice).purchaseWithLP(1);
     const tavern1 = await LP.balanceOf(tavernsKeep.address);
 
     expect(tavern1.sub(tavern0)).to.be.equal(actualCost);
     expect(await brewery.balanceOf(alice.address)).to.be.equal(1);
   });
 
-  it("Purchase with LP Zap", async () => {
-    await usdc.connect(alice).approve(purchaser.address, ethers.constants.MaxUint256);
-    await purchaser.setUSDCEnabled(true);
+  // it("Purchase with LP Zap", async () => {
+  //   await usdc.connect(alice).approve(purchaser.address, ethers.constants.MaxUint256);
+  //   await purchaser.setUSDCEnabled(true);
 
-    const discount = await purchaser.usdcDiscount();
+  //   const discount = await purchaser.usdcDiscount();
+  //   const usdcCost = await purchaser.getUSDCForMead(await settings.breweryCost());
+  //   const actualPercentage = BigNumber.from(1e4).sub(discount);
+  //   const actualCost = usdcCost.mul(actualPercentage).div(1e4);
+
+  //   const tavern0 = await usdc.balanceOf(tavernsKeep.address);
+  //   await purchaser.connect(alice).purchaseWithLPUsingZap(1);
+  //   const tavern1 = await usdc.balanceOf(tavernsKeep.address);
+
+  //   expect(tavern1.sub(tavern0)).to.be.equal(actualCost);
+  //   expect(await brewery.balanceOf(alice.address)).to.be.equal(1);
+  // });
+
+  it.only("Convert staking lp into brewery", async () => {
+    const LP = <IJoePair>await ethers.getContractAt("IJoePair", await settings.liquidityPair());
+    await LP.connect(alice).approve(purchaser.address, ethers.constants.MaxUint256);
+    await purchaser.setLPEnabled(true);
+
+    // prepare staking
+    const latestBlockNumber = await getLatestBlockNumber();
+    staking = <TavernStaking>await deployProxy(
+      "TavernStaking",
+      mead.address,
+      LP.address,
+      10,
+      latestBlockNumber,
+      latestBlockNumber + 100000000,
+      0,
+      0
+    );
+    await staking.setSettings(settings.address);
+    await classManager.grantRole(await classManager.MANAGER_ROLE(), staking.address);
+    await mead.transfer(staking.address, initialSupply.div(10));
+    await LP.connect(alice).approve(staking.address, ethers.constants.MaxUint256);
+
     const usdcCost = await purchaser.getUSDCForMead(await settings.breweryCost());
+    const lpCost = await purchaser.getLPFromUSDC(usdcCost);
+    const discount = await purchaser.calculateLPDiscount();
     const actualPercentage = BigNumber.from(1e4).sub(discount);
-    const actualCost = usdcCost.mul(actualPercentage).div(1e4);
+    const actualCost = lpCost.mul(actualPercentage).div(1e4);
+    await LP.transfer(alice.address, lpCost);
 
-    const tavern0 = await usdc.balanceOf(tavernsKeep.address);
-    await purchaser.connect(alice).purchaseWithLPUsingZap("test");
-    const tavern1 = await usdc.balanceOf(tavernsKeep.address);
+    await staking.connect(alice).deposit(lpCost);
+
+    const tavern0 = await LP.balanceOf(tavernsKeep.address);
+    await purchaser.connect(alice).convertStakeIntoBrewerys(staking.address, lpCost);
+    const tavern1 = await LP.balanceOf(tavernsKeep.address);
 
     expect(tavern1.sub(tavern0)).to.be.equal(actualCost);
     expect(await brewery.balanceOf(alice.address)).to.be.equal(1);
