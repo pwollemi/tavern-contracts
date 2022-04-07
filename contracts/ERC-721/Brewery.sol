@@ -456,10 +456,6 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
         ClassManager(settings.classManager()).addReputation(msg.sender, newReputation);
     }
 
-    function resetGlobalLastClaimed(address account) external {
-        globalLastClaimedAt[account] = 0;
-    }
-
     /**
      * @notice Handles the specific claiming of MEAD and distributing it to the rewards pool and the treasury
      */
@@ -678,6 +674,10 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
         breweryStats[_tokenId].experienceMultiplier = _value;
     }
 
+    function setBreweryLastClaimed(uint256 _tokenId, uint256 _lastClaimed) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        breweryStats[_tokenId].lastTimeClaimed = _lastClaimed;
+    }
+
     /**
      * @notice Sets the fermentation period for all BREWERYs
      */
@@ -719,6 +719,10 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
 
     function setMaxBreweries(uint256 maxLimit) external onlyRole(DEFAULT_ADMIN_ROLE) {
         maxBreweries = maxLimit;
+    }
+
+    function setGlobalLastClaimed(address account, uint256 lastClaimed) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        globalLastClaimedAt[account] = lastClaimed;
     }
 
     /**

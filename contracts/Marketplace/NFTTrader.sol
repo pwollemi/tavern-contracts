@@ -1,197 +1,267 @@
-// pragma solidity ^0.8.4;
+pragma solidity ^0.8.4;
 
-// import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-// import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-// import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-// import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-// import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-// import "../TavernSettings.sol";
-// import "../ERC-721/Brewery.sol";
-// import "../ERC-20/Mead.sol";
-// /**
-//  * @notice There are some conditions to make this work
-//  * 
-//  *  - Trader needs to have approval of the users BREWERY
-//  *  - Helper should be able to burn xMEAD
-//  *  - Helper should be able to award reputation
-//  * 
-//  */
-// contract TavernEscrowTrader is Initializable, OwnableUpgradeable {
-//     using SafeERC20Upgradeable for IERC20Upgradeable;
+import "../TavernSettings.sol";
+import "../ERC-721/Brewery.sol";
+import "../ERC-20/Mead.sol";
 
-//     /// @notice The data contract containing all of the necessary settings
-//     TavernSettings public settings;
+/**
+ * @notice There are some conditions to make this work
+ *
+ *  - Trader needs to have approval of the users BREWERY
+ *  - Helper should be able to burn xMEAD
+ *  - Helper should be able to award reputation
+ *
+ */
+contract TavernEscrowTrader is Initializable, OwnableUpgradeable {
+    using SafeERC20Upgradeable for IERC20Upgradeable;
 
-//     /// @notice The mead smart contract
-//     Mead public mead;
+    /// @notice The data contract containing all of the necessary settings
+    TavernSettings public settings;
 
-//     /// @notice The brewery smart contract
-//     Brewery public brewery;
+    /// @notice The mead smart contract, maybe you just need IERC20Upgradeable interface
+    Mead public mead;
 
-//     struct Order {
-//         bool active;
-//         uint256 tokenId;
-//         address seller;
-//         address buyer;
-//         uint256 price;
-//     }
+    /// @notice The brewery smart contract, maybe you just need IERC721Upgradeable interface
+    Brewery public brewery;
 
-//     /// @notice A mapping from order id to order data
-//     /// @dev This is a static, ever increasing list
-//     mapping (uint256 => Order) orders;
+    enum OrderStatus {
+        Active,
+        Canceled,
+        Sold
+    }
 
-//     /// @notice The amount of orders
-//     uint256 public orderCount;
+    struct Order {
+        uint256 id;
+        OrderStatus status;
+        uint256 tokenId;
+        address seller;
+        address buyer;
+        uint256 price;
+    }
 
-//     /// @notice The mapping from owner to a list of owned order ids to order ids
-//     /// @dev Used to enumerate orders
-//     mapping (address => mapping (uint256 => uint256)) ownedOrders;
+    /// @notice A mapping from order id to order data
+    /// @dev This is a static, ever increasing list
+    mapping(uint256 => Order) orders;
 
-//     /// @notice The mapping from order ids to owned order ids
-//     mapping (uint256 => uint256) ownedOrdersIndex;
+    /// @notice The amount of orders
+    uint256 public orderCount;
 
-//     /// @notice The mapping from owner to a count of how many orders this person has started
-//     mapping (address => uint256) ownedOrderCount;
+    // Mapping from owner to a list of owned auctions
+    mapping(address => uint256[]) public ownedOrders;
+    mapping(address => uint256[]) public boughtOrders;
 
-//     /// @notice The mapping of active order ids to order ids
-//     /// @dev Used to enumerate active orders
-//     mapping (uint256 => uint256) activeOrders;
+    event orderAdded(
+        uint256 indexed id,
+        address indexed seller,
+        uint256 indexed tokenId,
+        uint256 price
+    );
 
-//     /// @notice The amount of active orders
-//     uint256 public activeOrderCount;
+    event orderUpdated(uint256 indexed id, uint256 newPrice);
 
+    event orderCanceled(uint256 indexed id);
 
-//     // /// @notice A mapping of active order IDs to token IDs
-//     // mapping(uint256 => uint256) activeOrders;
+    event orderBought(uint256 indexed id, address indexed buyer);
 
-//     // /// @notice A mapping of token IDs to active order IDs
-//     // mapping(uint256 => uint256) activeOrderIds;
+    function initialize(
+        TavernSettings settings,
+        Mead mead,
+        Brewery brewery
+    ) external initializer {
+        __Ownable_init();
 
-//     // /// @notice A mapping of sellers to their list of owned orders
-//     // mapping(address => mapping(uint256 => uint256)) ownedOrders;
+        settings = settings;
+        mead = mead;
+        brewery = brewery;
+    }
 
-//     // /// @notice A mapping of token IDs to the order IDs
-//     // mapping(uint256 => uint256) ownedOrdersIndex;
+    /**
+     * @notice Creates an order, transfering into th
+     */
+    function createOrder(uint256 tokenId, uint256 price) external {
+        // the function return the address of the owner
+        require(brewery.ownerOf(tokenId) == msg.sender, "Not owner of token");
 
-//     // /// @notice A mapping of token IDs to the index of the order
-//     // mapping (uint256 => uint256) ownedOrderIds;
+        // Transfer the brewery into the escrow contract
+        brewery.safeTransferFrom(msg.sender, address(this), tokenId);
 
-//     function initialize(address settings, address mead, address brewery) external initializer {
-//         __Ownable_init();
+        // Create the order
+        orders[orderCount] = Order({
+            id: orderCount,
+            status: OrderStatus.Active,
+            tokenId: tokenId,
+            seller: msg.sender,
+            buyer: address(0),
+            price: price
+        });
 
-//         settings = TavernSettings(settings);
-//         mead = Mead(mead);
-//         brewery = Brewery(brewery);
-//     }
+        ownedOrders[msg.sender].push(orderCount);
 
-//     /**
-//      * @notice Creates an order, transfering into th
-//      */
-//     function createOrder(uint256 tokenId, uint256 price) external {
-//         require(brewery.ownerOf(tokenId) == true, "Not owner of token");
+        emit orderAdded(orderCount, msg.sender, tokenId, price);
 
-//         // Transfer the brewery into the escrow contract
-//         brewery.safeTransferFrom(msg.sender, address(this), tokenId);
+        orderCount++;
+    }
 
-//         // Create the order
-//         orders[orderCount] = Order({
-//             active: true,
-//             tokenId: tokenId,
-//             seller: msg.sender,
-//             buyer: address(0),
-//             price: price
-//         });
+    /**
+     * @notice Updates the price of a listed orders
+     */
+    function updateOrder(uint256 orderId, uint256 price) external {
+        Order storage order = orders[orderId];
+        require(
+            order.status == OrderStatus.Active,
+            "Order is no longer available!"
+        );
+        require(order.seller == msg.sender, "Only the seller can update order");
+        order.price = price;
 
-//         _addActiveOrder(msg.sender, tokenId);
+        emit orderUpdated(orderId, price);
+    }
 
-//         orderCount++;
-//         activeOrderCount++;
-//     }
+    /**
+     * @notice Cancels a currently listed order, returning the BREWERY to the owner
+     */
+    function cancelOrder(uint256 orderId) external {
+        Order storage order = orders[orderId];
+        require(
+            order.status == OrderStatus.Active,
+            "Order is no longer available!"
+        );
+        require(order.seller == msg.sender, "Only the seller can cancel order");
 
-//     /**
-//      * @notice Updates the price of a listed orders
-//      */
-//     function updateOrder(uint256 tokenId, uint256 price) external {
+        // Transfer the brewery into the escrow contract
+        _breweryApproveAndTransfer(msg.sender, order.tokenId);
 
-//     }
+        // Mark order
+        order.status = OrderStatus.Canceled;
 
-//     /**
-//      * @notice Cancels a currently listed order, returning the BREWERY to the owner
-//      */
-//     function cancelOrder(uint256 tokenId) external {
-//         Order storage order = orders[activeOrdersIndex[tokenId]];
-//         require(order.seller == msg.sender, "Only the seller can cancel order");
-        
-//         // Transfer the brewery into the escrow contract
-//         brewery.safeTransferFrom(address(this), msg.sender, tokenId);
+        emit orderCanceled(orderId);
+    }
 
-//         // Remove the active order
-//         _removeActiveOrder(tokenId);
-        
-//         // Mark order
-//         order.active = false;
-//     }
+    /**
+     * @notice Purchases an active order
+     * @dev    `amount` is needed to ensure buyer isnt frontrun
+     */
+    function buyOrder(uint256 orderId, uint256 amount) external {
+        Order storage order = orders[orderId];
+        require(
+            order.status == OrderStatus.Active,
+            "Order is no longer available!"
+        );
+        require(order.price == amount, "Amount isn't equal to price!");
 
-//     /**
-//      * @notice Purchases an active order
-//      * @dev    `amount` is needed to ensure buyer isnt frontrun
-//      */
-//     function buyOrder(uint256 tokenId, uint256 amount) external {
-//         Order storage order = orders[activeOrdersIndex[tokenId]];
-//         require(order.active, "Order is no longer available!");
-//         require(order.price == amount, "Amount isn't equal to price!");
+        // we sent the amount to this contract in first time, so the user doesn't need to approve other contracts/user
+        IERC20Upgradeable(mead).safeTransferFrom(
+            msg.sender,
+            address(this),
+            amount
+        );
 
-//         // Handle the transfer of payment
-//         // - Transfer 75% to the seller
-//         // - Of the 25%:
-//         //   - 70% goes to rewards pool
-//         //   - 30% goes to the treasury
-//         uint256 taxAmount = order.price * settings.marketplaceFee() / 1e4;
-//         uint256 sellerAmount = order.price - taxAmount;
-//         uint256 treasuryAmount = taxAmount * settings.treasuryFee() / 1e4;
-//         mead.safeTransferFrom(msg.sender, settings.tavernsKeep(), treasuryAmount);
-//         mead.safeTransferFrom(msg.sender, settings.rewardsPool(), taxAmount - treasuryAmount);
-//         mead.safeTransferFrom(msg.sender, order.seller, sellerAmount);
+        // Handle the transfer of payment
+        // - Transfer 75% to the seller
+        // - Of the 25%:
+        //   - 70% goes to rewards pool
+        //   - 30% goes to the treasury
+        uint256 taxAmount = (order.price * settings.marketplaceFee()) / 1e4;
+        uint256 sellerAmount = order.price - taxAmount;
+        uint256 treasuryAmount = (taxAmount * settings.treasuryFee()) / 1e4;
+        uint256 rewardPoolAmount = taxAmount - treasuryAmount;
 
-//         // Transfer the brewery to the buyer
-//         brewery.safeTransferFrom(address(this), msg.sender, tokenId);
+        _meadApproveAndTransfer(settings.tavernsKeep(), treasuryAmount);
+        _meadApproveAndTransfer(settings.rewardsPool(), rewardPoolAmount);
+        _meadApproveAndTransfer(order.seller, sellerAmount);
 
-//         // Remove the order from the active list
-//         _removeActiveOrder(tokenId);
+        // Transfer the brewery to the buyer
+        _breweryApproveAndTransfer(msg.sender, order.tokenId);
 
-//         // Mark order
-//         order.buyer = msg.sender;
-//         order.active = false;
-//     }
+        // Remove the order from the active list
+        boughtOrders[msg.sender].push(orderId);
 
-//     /**
-//      * @notice Used to add a tracked order
-//      */
-//     function _addActiveOrder(address seller, uint256 tokenId) internal {
-//         activeOrders[orderCount] = tokenId;
-//         activeOrdersIndex[tokenId] = orderCount;
+        // Mark order
+        order.buyer = msg.sender;
+        order.status = OrderStatus.Sold;
 
-//         ownedOrders[seller][]
-//         ownedOrdersIndex
-//     }
+        emit orderBought(orderId, msg.sender);
+    }
 
-//     /**
-//      * @notice Used to track an active order
-//      */
-//     function _removeActiveOrder(uint256 tokenId) internal {
-//         uint256 lastOrderId = activeOrderCount - 1;
-//         uint256 orderId = activeOrderIds[tokenId];
+    function _breweryApproveAndTransfer(address to, uint256 tokenId) internal {
+        brewery.approve(to, tokenId);
+        brewery.safeTransferFrom(address(this), to, tokenId);
+    }
 
-//         // Swap the order while we aren't on the last token
-//         if(orderId != lastOrderId) {
-//             uint256 lastTokenId = activeOrders[lastOrderId];
+    function _meadApproveAndTransfer(address to, uint256 amount) internal {
+        mead.approve(to, amount);
+        IERC20Upgradeable(mead).safeTransferFrom(address(this), to, amount);
+    }
 
-//             activeOrders[orderId] = lastTokenId;
-//             activeOrderIds[lastTokenId] = orderId;
-//         }
+    function countUserOrders(address user) public view returns (uint256) {
+        return ownedOrders[user].length;
+    }
 
-//         delete activeOrderIds[tokenId];
-//         delete activeOrders[lastOrderId];
-//     }
-// }
+    function countUserBought(address user) public view returns (uint256) {
+        return boughtOrders[user].length;
+    }
+
+    function fetchPageOrders(uint256 cursor, uint256 howMany)
+        public
+        view
+        returns (Order[] memory values, uint256 newCursor)
+    {
+        uint256 length = howMany;
+        if (length > orderCount - cursor) {
+            length = orderCount - cursor;
+        }
+
+        values = new Order[](length);
+        for (uint256 i = 0; i < length; i++) {
+            values[i] = orders[cursor + i];
+        }
+
+        return (values, cursor + length);
+    }
+
+    function fetchPageOwned(
+        address user,
+        uint256 cursor,
+        uint256 howMany
+    ) public view returns (Order[] memory values, uint256 newCursor) {
+        uint256 length = howMany;
+        uint256[] storage owned = ownedOrders[user];
+        if (length > owned.length - cursor) {
+            length = owned.length - cursor;
+        }
+
+        values = new Order[](length);
+        for (uint256 i = 0; i < length; i++) {
+            uint256 index = owned[cursor + i];
+            values[i] = orders[index];
+        }
+
+        return (values, cursor + length);
+    }
+
+    function fetchPageBought(
+        address user,
+        uint256 cursor,
+        uint256 howMany
+    ) public view returns (Order[] memory values, uint256 newCursor) {
+        uint256 length = howMany;
+        uint256[] storage bought = boughtOrders[user];
+        if (length > bought.length - cursor) {
+            length = bought.length - cursor;
+        }
+
+        values = new Order[](length);
+        for (uint256 i = 0; i < length; i++) {
+            uint256 index = bought[cursor + i];
+            values[i] = orders[index];
+        }
+
+        return (values, cursor + length);
+    }
+}

@@ -84,6 +84,12 @@ contract TavernSettings is Initializable, OwnableUpgradeable {
     /// @notice The amount of reputation gained per LP token, ignore decimals, accuracy is PRECISION
     uint256 public reputationPerStakingLP;
 
+    /// @notice The fee to apply on AVAX/USDC purchases
+    uint256 public marketplaceFee;
+
+    /// @notice The fee to apply on MEAD purchases
+    uint256 public marketplaceMeadFee;
+
     function initialize(
         address _xmead, 
         address _mead, 
@@ -211,5 +217,13 @@ contract TavernSettings is Initializable, OwnableUpgradeable {
 
     function setReputationPerStakingLP(uint256 _amount) external onlyOwner {
         reputationPerStakingLP = _amount;
+    }
+    
+    function setMarketplaceFee(uint256 _amount) external onlyOwner {
+        marketplaceFee = _amount;
+    }
+
+    function setMarketplaceMeadFee(uint256 _amount) external onlyOwner {
+        marketplaceMeadFee = _amount;
     }
 }

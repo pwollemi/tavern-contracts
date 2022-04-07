@@ -203,8 +203,8 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         user.rewardDebt = _amount.mul(poolInfo.accMeadPerShare).div(1e12).add(user.rewardDebt);
         emit Deposit(msg.sender, _amount);
 
-        uint256 newReputation = settings.reputationPerStakingLP() * _amount / (10 ** ERC20Upgradeable(poolInfo.lpToken).decimals()) / settings.PRECISION();
-        ClassManager(settings.classManager()).addReputation(msg.sender, newReputation);
+        uint256 reputation = _reputationForLpAmount(_amount);
+        ClassManager(settings.classManager()).addReputation(msg.sender, reputation);
     }
 
     // Claim pending rewards
@@ -240,8 +240,8 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         IERC20Upgradeable(poolInfo.lpToken).safeTransfer(address(msg.sender), _amount);
         emit Withdraw(msg.sender, _amount);
 
-        uint256 newReputation = settings.reputationPerStakingLP() * _amount / (10 ** ERC20Upgradeable(poolInfo.lpToken).decimals());
-        ClassManager(settings.classManager()).removeReputation(msg.sender, newReputation);
+        uint256 reputation = _reputationForLpAmount(_amount);
+        ClassManager(settings.classManager()).removeReputation(msg.sender, reputation);
     }
 
     function withdrawOnBehalf(address account, uint256 _amount) external nonReentrant {
@@ -265,8 +265,8 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         IERC20Upgradeable(poolInfo.lpToken).safeTransfer(account, _amount);
         emit Withdraw(account, _amount);
 
-        uint256 newReputation = settings.reputationPerStakingLP() * _amount / (10 ** ERC20Upgradeable(poolInfo.lpToken).decimals());
-        ClassManager(settings.classManager()).removeReputation(account, newReputation);
+        uint256 reputation = _reputationForLpAmount(_amount);
+        ClassManager(settings.classManager()).removeReputation(account, reputation);
     }
 
     // Withdraw without caring about rewards. EMERGENCY ONLY.
@@ -292,11 +292,9 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         }
     }
 
-    // function _reputationForLpAmount(uint256 _amount) internal {
-    //     uint256 lpAmountFor1000 = 1000 / BreweryPurchaseHelper(breweryPurchaseHelper).getUSDCForOneLP();
-    //     uint256 reputation = (50 * _amount) / lpAmountFor1000;
-    //     ClassManager(settings.classManager()).removeReputation(msg.sender, reputation);
-    // }
+    function _reputationForLpAmount(uint256 _amount) internal view returns (uint256) {
+        return settings.reputationPerStakingLP() * _amount / (10 ** ERC20Upgradeable(poolInfo.lpToken).decimals()) / settings.PRECISION();
+    }
 
     function setStartBlock(uint256 _start) external onlyOwner {
         startBlock = _start;
