@@ -57,5 +57,8 @@
     "markdownlint": "^0.22.0",
     "markdownlint-cli": "^0.26.0",
     "typechain": "^5.2.0"
+  },
+  "resolutions": {
+    "hardhat/**/@ethereumjs/tx": "3.5.0"
   }
 }
