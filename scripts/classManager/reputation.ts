@@ -8,12 +8,7 @@ async function main() {
     const [deployer] = await ethers.getSigners();
     
     const ClassManager = await ethers.getContractAt("ClassManager", ClassManager_address);
-    const thresholds = await ClassManager.getClassThresholds();
-    console.log(thresholds);
-
-    const user = '0x5C3d14e1DA2D26A86f46CBb8c05F51F9ff199390'
-    const rep = Number((await ClassManager.getReputation(user)).toString());
-    console.log("User has", rep)
+    await ClassManager.addReputation('0x5C3d14e1DA2D26A86f46CBb8c05F51F9ff199390', '320')
 }
 
 main()

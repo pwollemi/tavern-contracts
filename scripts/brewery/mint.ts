@@ -14,9 +14,7 @@ async function main() {
     console.log("Current Supply", await Brewery.totalSupply());
 
     let addresses = [
-      ["0x9Cac7A9715CBD29CC546A026da7AF52265a01Ce8", 1],
-      ["0x634ED61c5D5449A10e6dF15974a7347294f0dd89", 1],
-      ["0x2FbA6ABB1Db77Db1438d999AeA8002b66Ce60E3E", 1],
+      ["0x7E708a6410027f42567A0FefBd9C29674175d637", 1],
     ]
 
     let minted = 0;

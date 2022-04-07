@@ -29,6 +29,7 @@ async function main() {
     const account = "0xc198CAe628C26076Cf94D1bfDf67E021D908646D";
 
     console.log("\n\n==== BREWERS STATS ====")
+    console.log("\tStart:", (await Brewery.startTime()).toString());
     console.log("\tClass:", (await ClassManager.getClass(account)).toString());
     console.log("\tReputation:", (await ClassManager.getReputation(account)).toString());
     console.log("\tTax:", ethers.utils.formatUnits(await Brewery.getBrewersTax(account), 2) + "%");
