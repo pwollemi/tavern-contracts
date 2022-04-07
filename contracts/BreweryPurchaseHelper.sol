@@ -271,14 +271,15 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         // toPayLP             breweryAmount * breweryCostUSD / lpPriceUSD
         //                     6             * 600 000000     / 100 000000
         //                     12
-        uint256 lpPriceUSD = getUSDCForOneLP(); // 100 000000
-        uint256 stakeAmountUSD = stakeAmount * lpPriceUSD / settings.liquidityPair().decimals();
-        uint256 breweryCostUSD = getBreweryCostWithLPAndConvertDiscount(1);
-        uint256 breweryAmount = stakeAmountUSD / breweryCostUSD;
+        uint256 discount = calculateLPDiscount();
+        uint256 breweryPriceInUSDC = getUSDCForMead(settings.breweryCost());
+        uint256 breweryPriceInLP = getLPFromUSDC(breweryPriceInUSDC);
+        uint256 discountedPrice = breweryPriceInLP * (1e4 - discount) / 1e4;
+        uint256 breweryAmount = stakeAmount / discountedPrice;
 
         // Send the LP tokens from the account transacting this function to the taverns keep
         // as payment. The rest is then kept on the person (dust)
-        uint256 toPayLP = breweryAmount * breweryCostUSD / lpPriceUSD;
+        uint256 toPayLP = breweryAmount * discountedPrice;
         settings.liquidityPair().transferFrom(msg.sender, settings.tavernsKeep(), toPayLP);
 
         // Mint `breweryAmount`

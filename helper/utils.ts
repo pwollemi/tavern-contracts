@@ -19,6 +19,10 @@ export async function getLatestBlockTimestamp() : Promise<number> {
     return (await ethers.provider.getBlock("latest")).timestamp;
 }
 
+export async function getLatestBlockNumber() : Promise<number> {
+  return (await ethers.provider.getBlock("latest")).number;
+}
+
 export async function mineBlockTo(blockNumber: number) : Promise<void> {
   for (let i = await ethers.provider.getBlockNumber(); i < blockNumber; i += 1) {
     await mineBlock()
