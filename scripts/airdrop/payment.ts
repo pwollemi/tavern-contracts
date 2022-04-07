@@ -21,12 +21,12 @@ async function main() {
     const BreweryHelper = await ethers.getContractAt("BreweryPurchaseHelper", '0xA3d66fa0140260217F7781793CcDE3b030B58258');
 
     const payment = [
-        ["0x145d729EAe53DEA212cE970558D6Eb1846D15d20", 10000], // Zandro
-        ["0x0b7Aa713C1c62423F60e97a926528f7987b2716B", 6500],  // Arc
-        ["0xCfF3d83b7176F92fD2DE4CbA8CfE2241eA7eF374", 2000],  // Haynes
-        ["0x4bd9798972587b604B0eA35940A78AEb9f631059", 2000],  // Welshy
-        ["0x6200DC915D5Ab2cC704276675f0878fB952B3f49", 2000],  // Martin
-        ["0x190b01574468B639e9b63E21b96E8444008F01d7", 1000],  // Tom
+        ["0x145d729EAe53DEA212cE970558D6Eb1846D15d20", 10000],   // Zandro
+        ["0x0b7Aa713C1c62423F60e97a926528f7987b2716B", 6500],    // Arc
+        ["0xCfF3d83b7176F92fD2DE4CbA8CfE2241eA7eF374", 2000],    // Haynes
+        ["0x4bd9798972587b604B0eA35940A78AEb9f631059", 2000],    // Welshy
+        ["0x6200DC915D5Ab2cC704276675f0878fB952B3f49", 2000],    // Martin
+        ["0x190b01574468B639e9b63E21b96E8444008F01d7", 1000],    // Tom
         //["0xde94C4841C9D4Ecd8D1DF5b8BEC8170044F1fA58", 500],   // Jay
     ]
 
