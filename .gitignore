@@ -1,5 +1,7 @@
 
 .openzeppelin/
+data/
+data
 node_modules
 .env
 accounts.json
@@ -11,4 +13,3 @@ typechain
 cache
 artifacts
 data/abi
-data/
