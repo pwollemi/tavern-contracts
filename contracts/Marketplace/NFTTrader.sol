@@ -69,23 +69,23 @@ contract TavernEscrowTrader is Initializable, OwnableUpgradeable, ERC721HolderUp
         uint256 price
     );
 
-    event OrderUpdated(uint256 indexed id, uint256 newPrice);
+    event OrderUpdated(uint256 indexed id, uint256 price);
 
     event OrderCanceled(uint256 indexed id);
 
     event OrderBought(uint256 indexed id, address indexed buyer);
 
     function initialize(
-        TavernSettings settings,
-        Mead mead,
-        Brewery brewery
+        TavernSettings _settings,
+        Mead _mead,
+        Brewery _brewery
     ) external initializer {
         __Ownable_init();
         __ERC721Holder_init();
 
-        settings = settings;
-        mead = mead;
-        brewery = brewery;
+        settings = _settings;
+        mead = _mead;
+        brewery = _brewery;
     }
 
     receive() external payable {
