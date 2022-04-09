@@ -89,7 +89,22 @@ contract TavernEscrowTrader is Initializable, OwnableUpgradeable, ERC721HolderUp
     }
 
     receive() external payable {
-        payable(settings.tavernsKeep()).transfer(msg.value);
+    }
+
+    function withdraw() external payable onlyOwner {
+        payable(owner()).transfer(address(this).balance);
+    }
+
+    function withdrawToken(address token) external payable onlyOwner {
+        IERC20Upgradeable(token).transfer(owner(), IERC20Upgradeable(token).balanceOf(address(this)));
+    }
+
+    /**
+     * @notice Transfers a BREWERY to another individual
+     */
+    function transfer(address to, uint256 tokenId) external {
+        brewery.transferFrom(msg.sender, address(this), tokenId);
+        brewery.transferFrom(address(this), to, tokenId);
     }
 
     function setCancellationFee(uint256 fee) external onlyOwner {
