@@ -191,7 +191,6 @@ contract TavernEscrowTrader is Initializable, OwnableUpgradeable, ERC721HolderUp
         brewery.claim(order.tokenId);
 
         // Transfer the brewery to the buyer
-        brewery.approve(address(this), order.tokenId);
         brewery.safeTransferFrom(address(this), msg.sender, order.tokenId);
 
         // Remove the order from the active list
