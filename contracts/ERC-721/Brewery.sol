@@ -93,6 +93,9 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
     /// @notice Timestamp of the last claimed time of the user
     mapping(address => uint256) public globalLastClaimedAt;
 
+    /// @notice A mapping of which addresses are allowed to bypass the trading ban for BREWERYs
+    mapping (address => bool) public whitelist;
+
     /// @notice Emitted events
     event Claim(address indexed owner, uint256 tokenId, uint256 amount, uint256 timestamp);
     event LevelUp(address indexed owner, uint256 tokenId, uint256 tier, uint256 xp, uint256 timestamp);
@@ -256,8 +259,10 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
      * @notice Approves an address to spend a particular token
      */
     function _approve(address to, uint256 tokenId) internal virtual override {
-        require(tradingEnabled, "Trading is disabled");
-        require(!blacklist[to], "Address is blacklisted");
+        if (!whitelist[to]) {
+            require(tradingEnabled, "Trading is disabled");
+            require(!blacklist[to], "Address is blacklisted");
+        }
         super._approve(to, tokenId);
     }
 
@@ -266,8 +271,10 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
      * @dev See {IERC721-setApprovalForAll}.
      */
     function _setApprovalForAll(address operator, bool approved) internal virtual {
-        require(tradingEnabled, "Trading is disabled");
-        require(!blacklist[operator], "Operator is blacklisted");
+        if (!whitelist[operator]) {
+            require(tradingEnabled, "Trading is disabled");
+            require(!blacklist[operator], "Operator is blacklisted");
+        }
         super._setApprovalForAll(_msgSender(), operator, approved);
     }
 
@@ -279,8 +286,10 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
         address to,
         uint256 tokenId
     ) internal virtual override {
-        require(tradingEnabled, "Trading is disabled");
-        require(!blacklist[to] && !blacklist[from], "Address is blacklisted");
+        if (!(whitelist[from] || whitelist[to])) {
+            require(tradingEnabled, "Trading is disabled");
+            require(!blacklist[to] && !blacklist[from], "Address is blacklisted");
+        }
         super._transfer(from, to, tokenId);
     }
 
@@ -717,6 +726,10 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
         blacklist[account] = value;
     }
 
+    function setWhitelisted(address account, bool value) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        whitelist[account] = value;
+    }
+
     function setMaxBreweries(uint256 maxLimit) external onlyRole(DEFAULT_ADMIN_ROLE) {
         maxBreweries = maxLimit;
     }
@@ -730,15 +743,15 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
      *                   HOOK
      * ================================================================
      */
-    function _afterTokenTransfer(address from, address to, uint256 tokenId) internal override {
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal override {
         if(from != address(0)) {
             if (balanceOf(from) == 0) {
-                globalLastClaimedAt[from] = 0;
+                globalLastClaimedAt[from] = block.timestamp;
             }
         }
-        if (balanceOf(to) > 0 && globalLastClaimedAt[to] == 0) {
+        if (balanceOf(to) == 0 && globalLastClaimedAt[to] == 0) {
             globalLastClaimedAt[to] = block.timestamp;
         }
-        super._afterTokenTransfer(from, to, tokenId);
+        super._beforeTokenTransfer(from, to, tokenId);
     }
 }
