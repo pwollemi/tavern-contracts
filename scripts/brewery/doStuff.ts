@@ -25,7 +25,7 @@ async function main() {
     //await brewery.resetGlobalLastClaimed(deployer.address);
     //await brewery.setBreweryLastClaimed(8157, 0)
     //await brewery.setGlobalLastClaimed(deployer.address, 0)
-    await brewery.setBreweryTier(16175, 2);
+    await brewery.setWhitelisted(ethers.constants.AddressZero, true);
 }
 
 main()
