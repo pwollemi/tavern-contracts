@@ -20,7 +20,9 @@ async function main() {
 
     let tx;
 
-    tx = await BreweryHelper.withdrawToken(USDC_MAINNET);
+    tx = await BreweryHelper.setMinLiquidityDiscount(1000);
+    await tx.wait();
+    tx = await BreweryHelper.setMaxLiquidityDiscount(4000);
     await tx.wait();
     
     // tx = await BreweryHelper.setConversionPeriodRequirement(1);
