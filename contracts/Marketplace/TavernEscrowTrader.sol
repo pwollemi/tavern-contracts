@@ -134,6 +134,7 @@ contract TavernEscrowTrader is Initializable, OwnableUpgradeable, ERC721HolderUp
             "Order is no longer available!"
         );
         require(order.seller == msg.sender, "Only the seller can update order");
+        require(price > 0, "The price need to be more than 0");
         order.price = price;
 
         emit OrderUpdated(orderId, price);
