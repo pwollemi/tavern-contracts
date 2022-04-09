@@ -152,7 +152,6 @@ contract TavernEscrowTrader is Initializable, OwnableUpgradeable, ERC721HolderUp
         require(msg.value == cancellationFee, "Need to pay fee to cancel order");
 
         // Transfer the brewery back to the seller
-        brewery.approve(address(this), order.tokenId);
         brewery.safeTransferFrom(address(this), order.seller, order.tokenId);
 
         // Mark order
