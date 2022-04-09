@@ -6,9 +6,29 @@ import { USDC_MAINNET } from "../ADDRESSES";
 async function main() {
     // The signers
     const [deployer] = await ethers.getSigners();
+
+    const users = [
+        ['0x00426ec496D6AeAc556fBD3e1e00a307Ab7F5211', 4669],
+        ['0xe779E89CD1E26bccEDB4e5eF8EAADa20D6Ef314A', 71],
+        ['0x94ed7b2effA59f1Fb9686317046A27487E1350C5', 2435],
+        ['0x50186626647D49f7C4b64B5E8Bc322C0514e1126', 10],
+        ['0x4DfdF76c7A312599f82410E71b81948b715fB5AD', 127],
+        ['0x197f4c3Cc2C89a0f4C4E2443c453f29ecdf67D4b', 100],
+        ['0xE06B3e54aA92eC8c45f46D704358711F538B2454', 409],
+        ['0x2aCf0d7eFCD6Bae082301A78227eEc22643D72e4', 3824],
+        ['0x6676F78C465ba8860A31Ae619FC1C4B4AE233bF4', 75],
+    ];
     
+    let txCount = await deployer.getTransactionCount(); 
     const ClassManager = await ethers.getContractAt("ClassManager", ClassManager_address);
-    await ClassManager.addReputation('0x5C3d14e1DA2D26A86f46CBb8c05F51F9ff199390', '320')
+    for (let i = 0; i < users.length; ++i) {
+        const currentRep = Number((await ClassManager.getReputation(users[i][0].toString())).toString());
+
+        //console.log(`${users[i]} had ${users[i][1]} and now has ${currentRep} (difference ${currentRep - Number(users[i][1])})`)
+        const delta = Math.abs(currentRep - Number(users[i][1]));
+        await ClassManager.addReputation(users[i][0].toString(), delta, {nonce: txCount + i})
+        console.log(`${users[i]} awarded ${delta} rep`)
+    }
 }
 
 main()
