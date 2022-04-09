@@ -20,13 +20,11 @@ async function main() {
 
     let tx;
 
-    // tx = await BreweryHelper.setConversionDiscount(1000);
-    // await tx.wait();
-    
-    tx = await BreweryHelper.setConversionPeriodRequirement(1);
+    tx = await BreweryHelper.withdrawToken(USDC_MAINNET);
     await tx.wait();
-
     
+    // tx = await BreweryHelper.setConversionPeriodRequirement(1);
+    // await tx.wait();
 
     // await router.swapExactAVAXForTokens(
     //     0, 
