@@ -101,6 +101,9 @@ describe('Brewery', () => {
     await brewery.setTradingEnabled(true);
 
     await brewery.setMaxBreweries(100);
+
+    // whitelist for remove extrafee
+    mead.setWhitelist(marketplace.address, true);
   });
 
   it("order", async () => {
@@ -150,12 +153,12 @@ describe('Brewery', () => {
 
     // bob buy the nft for 2000
     expect(balanceBobAfter).to.be.equal(balanceBobBefore.sub(2000));
-    // 75% to the seller 2000 * 0.85 = 1700
-    expect(balanceAliceAfter).to.be.equal(balanceAliceBefore.add(1700));
-    // for the tax 70% go to the pool 300 * 0.7 = 210
-    expect(balanceRewardPoolAfter).to.be.equal(balanceRewardPoolBefore.add(210));
+    // 85% to the seller 2000 * 0.85 = 1700
+    expect(balanceAliceAfter).to.be.equal(balanceAliceBefore.add(1700));    
     // for the tax 30% go to the treasury 300 * 0.3 = 90
-    expect(balanceTreasuryAfter).to.be.equal(balanceTreasuryBefore.add(90));
+    // expect(balanceTreasuryAfter).to.be.equal(balanceTreasuryBefore.add(90));
+    // // for the tax 70% go to the pool 300 * 0.7 = 210
+    // expect(balanceRewardPoolAfter).to.be.equal(balanceRewardPoolBefore.add(210));
 
     // buyer (bob) owner of the nft
     let owner = await brewery.ownerOf(tokenId);
