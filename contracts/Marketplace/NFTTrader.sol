@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgradeable.sol";
 
 import "../TavernSettings.sol";
 import "../ERC-721/Brewery.sol";
@@ -18,7 +19,7 @@ import "../ERC-20/Mead.sol";
  *  - Helper should be able to award reputation
  *
  */
-contract TavernEscrowTrader is Initializable, OwnableUpgradeable {
+contract TavernEscrowTrader is Initializable, OwnableUpgradeable, ERC721HolderUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     /// @notice The data contract containing all of the necessary settings
@@ -47,27 +48,32 @@ contract TavernEscrowTrader is Initializable, OwnableUpgradeable {
 
     /// @notice A mapping from order id to order data
     /// @dev This is a static, ever increasing list
-    mapping(uint256 => Order) orders;
+    mapping(uint256 => Order) public orders;
 
     /// @notice The amount of orders
     uint256 public orderCount;
 
-    // Mapping from owner to a list of owned auctions
+    /// @notice Mapping from owner to a list of owned auctions
     mapping(address => uint256[]) public ownedOrders;
+
+    /// @notice Mapping from bought 
     mapping(address => uint256[]) public boughtOrders;
 
-    event orderAdded(
+    /// @notice How much it costs to cancel an order
+    uint256 public cancellationFee;
+
+    event OrderAdded(
         uint256 indexed id,
         address indexed seller,
         uint256 indexed tokenId,
         uint256 price
     );
 
-    event orderUpdated(uint256 indexed id, uint256 newPrice);
+    event OrderUpdated(uint256 indexed id, uint256 newPrice);
 
-    event orderCanceled(uint256 indexed id);
+    event OrderCanceled(uint256 indexed id);
 
-    event orderBought(uint256 indexed id, address indexed buyer);
+    event OrderBought(uint256 indexed id, address indexed buyer);
 
     function initialize(
         TavernSettings settings,
@@ -75,10 +81,19 @@ contract TavernEscrowTrader is Initializable, OwnableUpgradeable {
         Brewery brewery
     ) external initializer {
         __Ownable_init();
+        __ERC721Holder_init();
 
         settings = settings;
         mead = mead;
         brewery = brewery;
+    }
+
+    receive() external payable {
+        payable(settings.tavernsKeep()).transfer(msg.value);
+    }
+
+    function setCancellationFee(uint256 fee) external onlyOwner {
+        cancellationFee = fee;
     }
 
     /**
@@ -87,6 +102,7 @@ contract TavernEscrowTrader is Initializable, OwnableUpgradeable {
     function createOrder(uint256 tokenId, uint256 price) external {
         // the function return the address of the owner
         require(brewery.ownerOf(tokenId) == msg.sender, "Not owner of token");
+        require(price > 0, "The price need to be more than 0");
 
         // Transfer the brewery into the escrow contract
         brewery.safeTransferFrom(msg.sender, address(this), tokenId);
@@ -103,7 +119,7 @@ contract TavernEscrowTrader is Initializable, OwnableUpgradeable {
 
         ownedOrders[msg.sender].push(orderCount);
 
-        emit orderAdded(orderCount, msg.sender, tokenId, price);
+        emit OrderAdded(orderCount, msg.sender, tokenId, price);
 
         orderCount++;
     }
@@ -120,27 +136,29 @@ contract TavernEscrowTrader is Initializable, OwnableUpgradeable {
         require(order.seller == msg.sender, "Only the seller can update order");
         order.price = price;
 
-        emit orderUpdated(orderId, price);
+        emit OrderUpdated(orderId, price);
     }
 
     /**
      * @notice Cancels a currently listed order, returning the BREWERY to the owner
      */
-    function cancelOrder(uint256 orderId) external {
+    function cancelOrder(uint256 orderId) external payable {
         Order storage order = orders[orderId];
         require(
             order.status == OrderStatus.Active,
             "Order is no longer available!"
         );
         require(order.seller == msg.sender, "Only the seller can cancel order");
+        require(msg.value == cancellationFee, "Need to pay fee to cancel order");
 
-        // Transfer the brewery into the escrow contract
-        _breweryApproveAndTransfer(msg.sender, order.tokenId);
+        // Transfer the brewery back to the seller
+        brewery.approve(address(this), order.tokenId);
+        brewery.safeTransferFrom(address(this), order.seller, order.tokenId);
 
         // Mark order
         order.status = OrderStatus.Canceled;
 
-        emit orderCanceled(orderId);
+        emit OrderCanceled(orderId);
     }
 
     /**
@@ -155,29 +173,26 @@ contract TavernEscrowTrader is Initializable, OwnableUpgradeable {
         );
         require(order.price == amount, "Amount isn't equal to price!");
 
-        // we sent the amount to this contract in first time, so the user doesn't need to approve other contracts/user
-        IERC20Upgradeable(mead).safeTransferFrom(
-            msg.sender,
-            address(this),
-            amount
-        );
-
         // Handle the transfer of payment
-        // - Transfer 75% to the seller
-        // - Of the 25%:
+        // - Transfer 85% to the seller
+        // - Of the 15% taxed:
         //   - 70% goes to rewards pool
         //   - 30% goes to the treasury
-        uint256 taxAmount = (order.price * settings.marketplaceFee()) / 1e4;
+        uint256 taxAmount = (order.price * settings.marketplaceMeadFee()) / 1e4;
         uint256 sellerAmount = order.price - taxAmount;
         uint256 treasuryAmount = (taxAmount * settings.treasuryFee()) / 1e4;
         uint256 rewardPoolAmount = taxAmount - treasuryAmount;
 
-        _meadApproveAndTransfer(settings.tavernsKeep(), treasuryAmount);
-        _meadApproveAndTransfer(settings.rewardsPool(), rewardPoolAmount);
-        _meadApproveAndTransfer(order.seller, sellerAmount);
+        IERC20Upgradeable(mead).safeTransferFrom(msg.sender, settings.tavernsKeep(), treasuryAmount);
+        IERC20Upgradeable(mead).safeTransferFrom(msg.sender, settings.rewardsPool(), rewardPoolAmount);
+        IERC20Upgradeable(mead).safeTransferFrom(msg.sender, order.seller, sellerAmount);
+
+        // Claim any remaining MEAD on the brewery before passing it back over
+        brewery.claim(order.tokenId);
 
         // Transfer the brewery to the buyer
-        _breweryApproveAndTransfer(msg.sender, order.tokenId);
+        brewery.approve(address(this), order.tokenId);
+        brewery.safeTransferFrom(address(this), msg.sender, order.tokenId);
 
         // Remove the order from the active list
         boughtOrders[msg.sender].push(orderId);
@@ -186,17 +201,7 @@ contract TavernEscrowTrader is Initializable, OwnableUpgradeable {
         order.buyer = msg.sender;
         order.status = OrderStatus.Sold;
 
-        emit orderBought(orderId, msg.sender);
-    }
-
-    function _breweryApproveAndTransfer(address to, uint256 tokenId) internal {
-        brewery.approve(to, tokenId);
-        brewery.safeTransferFrom(address(this), to, tokenId);
-    }
-
-    function _meadApproveAndTransfer(address to, uint256 amount) internal {
-        mead.approve(to, amount);
-        IERC20Upgradeable(mead).safeTransferFrom(address(this), to, amount);
+        emit OrderBought(orderId, msg.sender);
     }
 
     function countUserOrders(address user) public view returns (uint256) {

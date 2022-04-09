@@ -275,6 +275,7 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         uint256 breweryPriceInUSDC = getUSDCForMead(settings.breweryCost());
         uint256 breweryPriceInLP = getLPFromUSDC(breweryPriceInUSDC);
         uint256 discountedPrice = breweryPriceInLP * (1e4 - discount) / 1e4;
+        discountedPrice = discountedPrice - discountedPrice * conversionDiscount / 1e4;
         uint256 breweryAmount = stakeAmount / discountedPrice;
 
         // Send the LP tokens from the account transacting this function to the taverns keep
@@ -462,6 +463,14 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
      *            ADMIN FUNCTIONS
      * ============================================================
      */
+     
+    /**
+     * @notice Withdraws stuck ERC-20 tokens from the contract
+     */
+    function withdrawToken(address _token) external payable onlyOwner {
+        IERC20Upgradeable(_token).transfer(owner(), IERC20Upgradeable(_token).balanceOf(address(this)));
+    }
+    
     function setUSDCEnabled(bool _b) external onlyOwner {
         isUSDCEnabled = _b;
     }
