@@ -71,8 +71,8 @@ describe('Brewery', () => {
     await settings.setWalletLimit(walletLimit);
     await settings.setRewardsPool(rewardsPool.address);
     await settings.setTavernsKeep(tavernsKeep.address);
-    // marketplace fee 25% or 2500/10000
-    await settings.setMarketplaceMeadFee(2500);
+    // marketplace fee 15% or 1500/10000
+    await settings.setMarketplaceMeadFee(1500);
 
     await impersonateForToken(USDC, deployer, "1000000");
     await usdc.transfer(alice.address, ethers.utils.parseUnits("100000", USDC.decimals));
@@ -150,12 +150,12 @@ describe('Brewery', () => {
 
     // bob buy the nft for 2000
     expect(balanceBobAfter).to.be.equal(balanceBobBefore.sub(2000));
-    // 75% to the seller 2000 * 0.75 = 1500
-    expect(balanceAliceAfter).to.be.equal(balanceAliceBefore.add(1500));
-    // for the tax 70% go to the pool 500 * 0.7 = 350
-    expect(balanceRewardPoolAfter).to.be.equal(balanceRewardPoolBefore.add(350));
-    // for the tax 30% go to the treasury 500 * 0.3 = 150
-    expect(balanceTreasuryAfter).to.be.equal(balanceTreasuryBefore.add(150));
+    // 75% to the seller 2000 * 0.85 = 1700
+    expect(balanceAliceAfter).to.be.equal(balanceAliceBefore.add(1700));
+    // for the tax 70% go to the pool 300 * 0.7 = 210
+    expect(balanceRewardPoolAfter).to.be.equal(balanceRewardPoolBefore.add(210));
+    // for the tax 30% go to the treasury 300 * 0.3 = 90
+    expect(balanceTreasuryAfter).to.be.equal(balanceTreasuryBefore.add(90));
 
     // buyer (bob) owner of the nft
     let owner = await brewery.ownerOf(tokenId);
