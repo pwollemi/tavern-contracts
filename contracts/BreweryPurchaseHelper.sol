@@ -231,6 +231,12 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         uint256 breweryAmount = claimed / breweryCostWithDiscount;
         require(breweryAmount > 0, "Not enough rewards to compound");
 
+        uint256 maximumAllowed = settings.walletLimit() - brewery.balanceOf(msg.sender);
+        require(maximumAllowed > 0, "You can't compound more due to wallet limit");
+        if (breweryAmount > maximumAllowed) {
+            breweryAmount = maximumAllowed;
+        }
+
         uint256 meadAmount = breweryAmount * breweryCostWithDiscount;
 
         // Mint logic
@@ -271,6 +277,12 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         uint256 discountedPrice = breweryPriceInLP * (1e4 - discount) / 1e4;
         discountedPrice = discountedPrice - discountedPrice * conversionDiscount / 1e4;
         uint256 breweryAmount = stakeAmount / discountedPrice;
+
+        uint256 maximumAllowed = settings.walletLimit() - brewery.balanceOf(msg.sender);
+        require(maximumAllowed > 0, "You can't compound more due to wallet limit");
+        if (breweryAmount > maximumAllowed) {
+            breweryAmount = maximumAllowed;
+        }
 
         // Send the LP tokens from the account transacting this function to the taverns keep
         // as payment. The rest is then kept on the person (dust)

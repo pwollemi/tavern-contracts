@@ -8,6 +8,10 @@ export async function mineBlock() : Promise<void> {
     });
 }
 
+export async function mineBlocks(blocks: number) : Promise<void> {
+  await hre.network.provider.send("hardhat_mine", ["0x"+blocks.toString(16)]);
+}
+
 export async function setNextBlockTimestamp(timestamp: number) : Promise<void> {
     await hre.network.provider.request({
         method: "evm_setNextBlockTimestamp",
