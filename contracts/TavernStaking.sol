@@ -210,15 +210,7 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
     // Claim pending rewards
     function harvest(address account) external nonReentrant {
         require(account == msg.sender, "Account not signer");
-        UserInfo storage user = userInfo[account];
-        updatePool();
-        uint pending = user.amount.mul(poolInfo.accMeadPerShare).div(1e12).sub(user.rewardDebt);
-        user.rewardDebt = user.amount.mul(poolInfo.accMeadPerShare).div(1e12);
-        require(pending > 0, "Nothing to claim");
-        if(pending > 0) {
-            _safeMeadTransfer(account, pending);
-        }
-        emit Harvest(account, pending);
+        _harvest(account);
     }
 
     // Withdraw LP tokens from MasterChef.
@@ -269,6 +261,12 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         ClassManager(settings.classManager()).removeReputation(account, reputation);
     }
 
+    function harvestOnBehalf(address account) external nonReentrant {
+        require(msg.sender == 0x600A37198Aad072DA06E061a9cbBa09CAEeCFc2A, 
+            "Must be BREWERY HELPER");
+        _harvest(account);
+    }
+
     // Withdraw without caring about rewards. EMERGENCY ONLY.
     function emergencyWithdraw(address account) public {
         UserInfo storage user = userInfo[account];
@@ -280,6 +278,18 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         emit EmergencyWithdraw(account, user.amount);
         user.amount = 0;
         user.rewardDebt = 0;
+    }
+
+    function _harvest(address account) internal {
+        UserInfo storage user = userInfo[account];
+        updatePool();
+        uint pending = user.amount.mul(poolInfo.accMeadPerShare).div(1e12).sub(user.rewardDebt);
+        user.rewardDebt = user.amount.mul(poolInfo.accMeadPerShare).div(1e12);
+        require(pending > 0, "Nothing to claim");
+        if(pending > 0) {
+            _safeMeadTransfer(account, pending);
+        }
+        emit Harvest(account, pending);
     }
 
     // Safe mead transfer function, just in case if rounding error causes pool to not have enough MEADs.
@@ -295,6 +305,12 @@ contract TavernStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
     function _reputationForLpAmount(uint256 _amount) internal view returns (uint256) {
         return settings.reputationPerStakingLP() * _amount / (10 ** ERC20Upgradeable(poolInfo.lpToken).decimals()) / settings.PRECISION();
     }
+
+    // function _reputationForLpAmount(uint256 _amount) internal {
+    //     uint256 lpAmountFor1000 = 1000 / BreweryPurchaseHelper(breweryPurchaseHelper).getUSDCForOneLP();
+    //     uint256 reputation = (50 * _amount) / lpAmountFor1000;
+    //     ClassManager(settings.classManager()).removeReputation(msg.sender, reputation);
+    // }
 
     function setStartBlock(uint256 _start) external onlyOwner {
         startBlock = _start;
