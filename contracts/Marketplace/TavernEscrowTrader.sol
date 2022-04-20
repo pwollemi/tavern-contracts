@@ -10,6 +10,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgra
 import "../TavernSettings.sol";
 import "../ERC-721/Brewery.sol";
 import "../ERC-20/Mead.sol";
+import "../BreweryPurchaseHelper.sol";
 
 /**
  * @notice There are some conditions to make this work
@@ -62,6 +63,9 @@ contract TavernEscrowTrader is Initializable, OwnableUpgradeable, ERC721HolderUp
     /// @notice How much it costs to cancel an order
     uint256 public cancellationFee;
 
+    /// @notice The brewery purchase helper
+    address public breweryPurchaseHelper;
+
     event OrderAdded(
         uint256 indexed id,
         address indexed seller,
@@ -109,6 +113,10 @@ contract TavernEscrowTrader is Initializable, OwnableUpgradeable, ERC721HolderUp
 
     function setCancellationFee(uint256 fee) external onlyOwner {
         cancellationFee = fee;
+    }
+
+    function setBreweryPurchaseHelper(address purchaseHelper) external onlyOwner {
+        breweryPurchaseHelper = purchaseHelper;
     }
 
     /**
@@ -201,6 +209,42 @@ contract TavernEscrowTrader is Initializable, OwnableUpgradeable, ERC721HolderUp
         IERC20Upgradeable(mead).safeTransferFrom(msg.sender, settings.tavernsKeep(), treasuryAmount);
         IERC20Upgradeable(mead).safeTransferFrom(msg.sender, settings.rewardsPool(), rewardPoolAmount);
         IERC20Upgradeable(mead).safeTransferFrom(msg.sender, order.seller, sellerAmount);
+
+        // Claim any remaining MEAD on the brewery before passing it back over
+        brewery.claim(order.tokenId);
+
+        // Transfer the brewery to the buyer
+        brewery.safeTransferFrom(address(this), msg.sender, order.tokenId);
+
+        // Remove the order from the active list
+        boughtOrders[msg.sender].push(orderId);
+
+        // Mark order
+        order.buyer = msg.sender;
+        order.status = OrderStatus.Sold;
+
+        emit OrderBought(orderId, msg.sender);
+    }
+
+    /**
+     * @notice Purchases an active order
+     * @dev    `amount` is needed to ensure buyer isnt frontrun
+     */
+    function buyOrderWithUSDC(uint256 orderId, uint256 amount) external {
+        Order storage order = orders[orderId];
+        require(
+            order.status == OrderStatus.Active,
+            "Order is no longer available!"
+        );
+        require(order.price == amount, "Amount isn't equal to price!");
+
+        // Handle the transfer of payment
+        // - Transfer 75% to the seller
+        // - Transfer 25% treasury
+        uint256 orderAmountUSDC = BreweryPurchaseHelper(breweryPurchaseHelper).getUSDCForMead(order.price);
+        uint256 taxAmountUSDC = (orderAmountUSDC * settings.marketplaceFee()) / 1e4;
+        IERC20Upgradeable(settings.usdc()).safeTransferFrom(msg.sender, settings.tavernsKeep(), taxAmountUSDC);
+        IERC20Upgradeable(settings.usdc()).safeTransferFrom(msg.sender, order.seller, orderAmountUSDC - taxAmountUSDC);
 
         // Claim any remaining MEAD on the brewery before passing it back over
         brewery.claim(order.tokenId);

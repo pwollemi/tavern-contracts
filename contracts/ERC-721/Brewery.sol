@@ -485,7 +485,7 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
      */
     function claim(uint256 _tokenId) public {
         require(ownerOf(_tokenId) == _msgSender(), "Must be owner of this BREWERY");
-        require(getApproved(_tokenId) == address(0), "BREWERY is approved for spending/listed");
+        // require(getApproved(_tokenId) == address(0), "BREWERY is approved for spending/listed");
 
         // Award MEAD tokens
         uint256 totalRewards = pendingMead(_tokenId);
