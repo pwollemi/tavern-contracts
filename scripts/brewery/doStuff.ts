@@ -1,5 +1,5 @@
 import { ethers } from "hardhat";
-import { TreasuryAddress, USDC_MAINNET } from "../ADDRESSES";
+import { MARKETPLACE_ADDRESS, TreasuryAddress, USDC_MAINNET } from "../ADDRESSES";
 import ERC20 from '../../abis/ERC20.json';
 import { BreweryHelper_address, Brewery_address, ClassManager_address, Mead_address, RedeemHelper_address, settings_address } from "../NFT_ADDRESSES";
 import { text } from "stream/consumers";
@@ -21,11 +21,17 @@ async function main() {
     const ClassManager = await ethers.getContractAt("ClassManager", ClassManager_address)
     const BreweryHelper = await ethers.getContractAt("BreweryPurchaseHelper", '0xA3d66fa0140260217F7781793CcDE3b030B58258');
 
+    //await brewery.setBreweryTier(16175, 2);
+    //await brewery.setBreweryXp(16175, 4000000);
 
+    let tx = await brewery.setMaxBreweries(16673)
+    await tx.wait();
+    tx = await brewery.mint("0x6e518B9EC4B35Da022C885a305b524b8B53e3373", "");
+    await tx.wait();
+    await brewery.setBreweryTier(16673, 2);
     //await brewery.resetGlobalLastClaimed(deployer.address);
     //await brewery.setBreweryLastClaimed(8157, 0)
     //await brewery.setGlobalLastClaimed(deployer.address, 0)
-    await brewery.setWhitelisted(ethers.constants.AddressZero, true);
 }
 
 main()
