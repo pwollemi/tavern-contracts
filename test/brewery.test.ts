@@ -38,6 +38,7 @@ describe('Brewery', () => {
   let settings: TavernSettings;
   let classManager: ClassManager;
 
+  const ONE_DAY = 60 * 60 * 24; // 86400
   const baseDailyYield = ethers.utils.parseUnits("2", 18);
   const baseFermentationPeriod = duration.days(14).toNumber();
   // in 1 day, it increases 10 XP, accuracy is PRECISION
@@ -69,6 +70,7 @@ describe('Brewery', () => {
     await settings.setWalletLimit(walletLimit);
     await settings.setRewardsPool(rewardsPool.address);
     await settings.setTavernsKeep(tavernsKeep.address);
+    await settings.setReputationForClaimPerDay(1000);
 
     await impersonateForToken(USDC, deployer, "1000000");
     await usdc.transfer(alice.address, ethers.utils.parseUnits("100000", USDC.decimals));
@@ -108,7 +110,8 @@ describe('Brewery', () => {
       await brewery.connect(minter).mint(alice.address, "test");
       await brewery.connect(minter).mint(alice.address, "test");
       await brewery.connect(minter).mint(alice.address, "test");
-      await expect(brewery.connect(minter).mint(alice.address, "test")).to.be.revertedWith("Cant go over limit");
+      await expect(brewery.connect(minter).mint(alice.address, "test"))
+        .to.be.revertedWith("Cant go over wallet limit");
     });
 
     it("token infos should be correct", async () => {
@@ -156,7 +159,7 @@ describe('Brewery', () => {
 
   it("XP earning", async () => {
     const lastTime = await getLatestBlockTimestamp();
-    const startTime = lastTime + 86400 * 10;
+    const startTime = lastTime + ONE_DAY * 10;
     await brewery.setStartTime(startTime);
     await brewery.connect(minter).mint(alice.address, "test");
 
@@ -170,27 +173,61 @@ describe('Brewery', () => {
 
     // after fermenation period
     const fermentationTime = startTime + baseFermentationPeriod;
-    await setNextBlockTimestamp(fermentationTime + 86400);
+    await setNextBlockTimestamp(fermentationTime + ONE_DAY);
     await mineBlock();
-    expect(await brewery.getPendingXp(1)).to.be.equal(86400 * baseExperiencePerSecond);
+    expect(await brewery.getPendingXp(1)).to.be.equal(ONE_DAY * baseExperiencePerSecond);
 
     // after first claim
     await brewery.connect(alice).claim(1);
     const lastClaimed = await getLatestBlockTimestamp();
-    await setNextBlockTimestamp(lastClaimed + 86400);
+    await setNextBlockTimestamp(lastClaimed + ONE_DAY);
     await mineBlock();
     expect(await brewery.getPendingXp(1)).to.be.equal(0);
 
     // after fermenation period
     const fermentationTime1 = lastClaimed + baseFermentationPeriod;
-    await setNextBlockTimestamp(fermentationTime1 + 86400);
+    await setNextBlockTimestamp(fermentationTime1 + ONE_DAY);
     await mineBlock();
-    expect(await brewery.getPendingXp(1)).to.be.equal(86400 * baseExperiencePerSecond);
+    expect(await brewery.getPendingXp(1)).to.be.equal(ONE_DAY * baseExperiencePerSecond);
+  });
+
+  it("Reputation earning", async () => {
+    const lastTime = await getLatestBlockTimestamp();
+    const startTime = lastTime + ONE_DAY * 10;
+    await brewery.setStartTime(startTime);
+    await brewery.connect(minter).mint(alice.address, "test");
+
+    // before startTime
+    expect(await brewery.getPendingReputation(alice.address)).to.be.equal(0);
+
+    // during the first fermentation period
+    await setNextBlockTimestamp(startTime + baseFermentationPeriod / 2);
+    await mineBlock();
+    expect(await brewery.getPendingReputation(alice.address)).to.be.equal(0);
+
+    // after fermenation period
+    const fermentationTime = startTime + baseFermentationPeriod;
+    await setNextBlockTimestamp(fermentationTime + ONE_DAY);
+    await mineBlock();
+    expect(await brewery.getPendingReputation(alice.address)).to.be.equal(1000);
+
+    // after first claim
+    await brewery.connect(alice).claim(1);
+    const lastClaimed = await getLatestBlockTimestamp();
+    await setNextBlockTimestamp(lastClaimed + ONE_DAY);
+    await mineBlock();
+    expect(await brewery.getPendingReputation(alice.address)).to.be.equal(0);
+
+    // after fermenation period
+    const fermentationTime1 = lastClaimed + baseFermentationPeriod;
+    await setNextBlockTimestamp(fermentationTime1 + ONE_DAY * 2.5);
+    await mineBlock();
+    expect(await brewery.getPendingReputation(alice.address)).to.be.equal(1000 * 2.5);
   });
 
   it("Pending Mead", async () => {
     const lastTime = await getLatestBlockTimestamp();
-    const startTime = lastTime + 86400 * 10;
+    const startTime = lastTime + ONE_DAY * 10;
     await brewery.setStartTime(startTime);
     await brewery.connect(minter).mint(alice.address, "test");
     const mintTime = await getLatestBlockTimestamp();
@@ -203,38 +240,38 @@ describe('Brewery', () => {
     await setNextBlockTimestamp(startTime + rewardPeriod);
     await mineBlock();
     const tier = await brewery.getTier(1);
-    const rewardAmount = yields[tier.toNumber()].div(86400).mul(rewardPeriod);
+    const rewardAmount = yields[tier.toNumber()].div(ONE_DAY).mul(rewardPeriod);
     expect(await brewery.getRewardPeriod(mintTime)).to.be.equal(rewardPeriod);
     expect(await brewery.pendingMead(1)).to.be.equal(rewardAmount);
 
     // after fermenation period
-    const rewardPeriod1 = baseFermentationPeriod + 86400;
+    const rewardPeriod1 = baseFermentationPeriod + ONE_DAY;
     const fermentationTime = startTime + baseFermentationPeriod;
-    await setNextBlockTimestamp(fermentationTime + 86400);
+    await setNextBlockTimestamp(fermentationTime + ONE_DAY);
     await mineBlock();
     const tier1 = await brewery.getTier(1);
-    const rewardAmount1 = yields[tier1.toNumber()].div(86400).mul(rewardPeriod1);
+    const rewardAmount1 = yields[tier1.toNumber()].div(ONE_DAY).mul(rewardPeriod1);
     expect(await brewery.getRewardPeriod(mintTime)).to.be.equal(rewardPeriod1);
     expect(await brewery.pendingMead(1)).to.be.equal(rewardAmount1);
 
     // after first claim
-    const rewardPeriod2 = 86400;
+    const rewardPeriod2 = ONE_DAY;
     await brewery.connect(alice).claim(1);
     const lastClaimed = await getLatestBlockTimestamp();
     await setNextBlockTimestamp(lastClaimed + rewardPeriod2);
     await mineBlock();
     const tier2 = await brewery.getTier(1);
-    const rewardAmount2 = yields[tier2.toNumber()].div(86400).mul(rewardPeriod2);
+    const rewardAmount2 = yields[tier2.toNumber()].div(ONE_DAY).mul(rewardPeriod2);
     expect(await brewery.getRewardPeriod(lastClaimed)).to.be.equal(rewardPeriod2);
     expect(await brewery.pendingMead(1)).to.be.equal(rewardAmount2);
 
     // after fermenation period
-    const rewardPeriod3 = baseFermentationPeriod + 86400;
+    const rewardPeriod3 = baseFermentationPeriod + ONE_DAY;
     const fermentationTime1 = lastClaimed + baseFermentationPeriod;
-    await setNextBlockTimestamp(fermentationTime1 + 86400);
+    await setNextBlockTimestamp(fermentationTime1 + ONE_DAY);
     await mineBlock();
     const tier3 = await brewery.getTier(1);
-    const rewardAmount3 = yields[tier3.toNumber()].div(86400).mul(rewardPeriod3);
+    const rewardAmount3 = yields[tier3.toNumber()].div(ONE_DAY).mul(rewardPeriod3);
     expect(await brewery.getRewardPeriod(lastClaimed)).to.be.equal(rewardPeriod3);
     expect(await brewery.pendingMead(1)).to.be.equal(rewardAmount3);
   });
@@ -243,7 +280,7 @@ describe('Brewery', () => {
     it("only owner can claim rewards", async () => {
       await brewery.connect(minter).mint(alice.address, "test");
       const lastClaimed = await getLatestBlockTimestamp();
-      await setNextBlockTimestamp(lastClaimed + 86400);
+      await setNextBlockTimestamp(lastClaimed + ONE_DAY);
       await expect(brewery.connect(bob).claim(1)).to.be.revertedWith("Must be owner of this BREWERY");
     });
 
@@ -252,7 +289,7 @@ describe('Brewery', () => {
       await brewery.setTradingEnabled(true);
       await brewery.connect(alice).approve(bob.address, 1)
       const lastClaimed = await getLatestBlockTimestamp();
-      await setNextBlockTimestamp(lastClaimed + 86400);
+      await setNextBlockTimestamp(lastClaimed + ONE_DAY);
       await expect(brewery.connect(alice).claim(1)).to.be.revertedWith("BREWERY is approved for spending/listed");
     });
 
@@ -261,8 +298,8 @@ describe('Brewery', () => {
       const lastClaimed = await getLatestBlockTimestamp();
       const rewardPeriod = baseFermentationPeriod / 2;
       // tier is zero
-      const rewardAmount = yields[0].div(86400).mul(rewardPeriod);
-      const claimTax = rewardAmount.mul(taxRates[0]).div(10000);
+      const rewardAmount = yields[0].div(ONE_DAY).mul(rewardPeriod);
+      const claimTax = rewardAmount.mul(taxRates[2]).div(10000);
       const userReward = rewardAmount.sub(claimTax);
 
       await setNextBlockTimestamp(lastClaimed + rewardPeriod);
@@ -283,7 +320,7 @@ describe('Brewery', () => {
     it("Correct XP should be gained", async () => {
       await brewery.connect(minter).mint(alice.address, "test");
       const lastClaimed = await getLatestBlockTimestamp();
-      const xpGainPeriod = 86400;
+      const xpGainPeriod = ONE_DAY;
       const rewardPeriod = baseFermentationPeriod + xpGainPeriod;
       const newXP = xpGainPeriod * baseExperiencePerSecond;
 
@@ -304,11 +341,11 @@ describe('Brewery', () => {
       await brewery.connect(minter).mint(alice.address, "test");
       const lastClaimed = await getLatestBlockTimestamp();
       const rewardPeriod = baseFermentationPeriod * 100;
-      const totalMeads = yields[0].div(86400).mul(rewardPeriod);
+      const totalMeads = yields[0].div(ONE_DAY).mul(rewardPeriod);
       const totalCost = (await settings.breweryCost()).mul(count);
       const treasuryCut = totalCost.mul(await settings.treasuryFee()).div(1e4);
       const userClaimAmount = totalMeads.sub(totalCost);
-      const claimTax = userClaimAmount.mul(taxRates[0]).div(10000);
+      const claimTax = userClaimAmount.mul(taxRates[2]).div(10000);
       const userReward = userClaimAmount.sub(claimTax);
 
       await setNextBlockTimestamp(lastClaimed + rewardPeriod);
@@ -330,7 +367,7 @@ describe('Brewery', () => {
       await brewery.connect(minter).mint(alice.address, "test");
       const lastClaimed = await getLatestBlockTimestamp();
       const rewardPeriod = baseFermentationPeriod * 10;
-      const totalMeads = yields[0].div(86400).mul(rewardPeriod);
+      const totalMeads = yields[0].div(ONE_DAY).mul(rewardPeriod);
       const count = totalMeads.div(await settings.breweryCost());
 
       await setNextBlockTimestamp(lastClaimed + rewardPeriod);

@@ -419,9 +419,9 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
      */
     function getPendingXp(uint256 _tokenId) public view returns (uint256) {
         // Check fermentation period and Increase XP
-        uint256 fermentationPeriod = getFermentationPeriod(_tokenId);
-        uint256 xpStartTime = startTime > breweryStats[_tokenId].lastTimeClaimed ? startTime : breweryStats[_tokenId].lastTimeClaimed;
-        uint256 fermentationTime = xpStartTime + fermentationPeriod;
+        uint256 fPeriod = getFermentationPeriod(_tokenId);
+        uint256 countStartTime = startTime > breweryStats[_tokenId].lastTimeClaimed ? startTime : breweryStats[_tokenId].lastTimeClaimed;
+        uint fermentationTime = countStartTime + fPeriod;
 
         // Only award XP if we elapsed past the fermentation period
         if (block.timestamp >= fermentationTime) {
@@ -430,6 +430,28 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
         } else {
             return 0;
         }
+    }
+
+    /**
+     * @notice Calculate total reputation including the pending reputation
+     */
+
+    function getTotalReputation(address account) public view returns (uint) {
+        return ClassManager(settings.classManager()).getReputation(account) +
+            getPendingReputation(account);
+    }
+
+    /**
+     * @notice Calculates the pending Reputation to view on the front end
+     */
+    function getPendingReputation(address account) public view returns (uint) {
+        uint256 lastClaimedAt = startTime > globalLastClaimedAt[account] ? startTime : globalLastClaimedAt[account];
+        uint256 fermentationEnd = lastClaimedAt + fermentationPeriod;
+        if (fermentationEnd >= block.timestamp) {
+            return 0;
+        }
+        uint256 repPeriod = block.timestamp - fermentationEnd;
+        return repPeriod * settings.reputationForClaimPerDay() / 86400;
     }
 
     /**
@@ -454,15 +476,9 @@ contract Brewery is Initializable, ERC721EnumerableUpgradeable, AccessControlUpg
         if (globalLastClaimedAt[msg.sender] == 0) {
             globalLastClaimedAt[msg.sender] = startTime;
         }
-        uint256 lastClaimedAt = globalLastClaimedAt[msg.sender];
-        uint256 fermentationEnd = lastClaimedAt + fermentationPeriod;
         globalLastClaimedAt[msg.sender] = block.timestamp;
-        if (fermentationEnd >= block.timestamp) {
-            return;
-        }
-        uint256 repPeriod = block.timestamp - fermentationEnd;
-        uint256 newReputation = repPeriod * settings.reputationForClaimPerDay() / 86400;
-        ClassManager(settings.classManager()).addReputation(msg.sender, newReputation);
+        uint pendingReputation = getPendingReputation(msg.sender);
+        ClassManager(settings.classManager()).addReputation(msg.sender, pendingReputation);
     }
 
     /**
