@@ -3,7 +3,7 @@ import hre, { ethers } from "hardhat";
 import { solidity } from "ethereum-waffle";
 import chai from 'chai';
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
-import { setNextBlockTimestamp, getLatestBlockTimestamp, mineBlock, latest, impersonateForToken, duration, getLatestBlockNumber } from "../helper/utils";
+import { setNextBlockTimestamp, getLatestBlockTimestamp, mineBlock, latest, impersonateForToken, duration, getLatestBlockNumber, mineBlocks } from "../helper/utils";
 import { deployContract, deployProxy } from "../helper/deployer";
 import { Brewery, BreweryPurchaseHelper, ClassManager, IERC20, IJoeFactory, IJoePair, IJoePair__factory, IJoeRouter02, Mead, Renovation, TavernSettings, TavernStaking, WhitelistPresale, XMead } from "../typechain";
 import { BigNumber } from "ethers";
@@ -195,7 +195,7 @@ describe('Brewery Purchase Helper', () => {
   //   expect(await brewery.balanceOf(alice.address)).to.be.equal(1);
   // });
 
-  it.only("Convert staking lp into brewery", async () => {
+  it("Convert staking lp into brewery", async () => {
     const LP = <IJoePair>await ethers.getContractAt("IJoePair", await settings.liquidityPair());
     await LP.connect(alice).approve(purchaser.address, ethers.constants.MaxUint256);
     await purchaser.setLPEnabled(true);
@@ -232,6 +232,58 @@ describe('Brewery Purchase Helper', () => {
 
     expect(tavern1.sub(tavern0)).to.be.equal(actualCost);
     expect(await brewery.balanceOf(alice.address)).to.be.equal(1);
+  });
+
+
+  it("Convert pending meads into brewery", async () => {
+    const LP = <IJoePair>await ethers.getContractAt("IJoePair", await settings.liquidityPair());
+    await LP.connect(alice).approve(purchaser.address, ethers.constants.MaxUint256);
+    await purchaser.setLPEnabled(true);
+
+    // prepare staking
+    const latestBlockNumber = await getLatestBlockNumber();
+    const rewardPerBlock = 1000000000000000;
+    staking = <TavernStaking>await deployProxy(
+      "TavernStaking",
+      mead.address,
+      LP.address,
+      rewardPerBlock,
+      latestBlockNumber,
+      latestBlockNumber + 100000000,
+      0,
+      0
+    );
+    await staking.setSettings(settings.address);
+    await classManager.grantRole(await classManager.MANAGER_ROLE(), staking.address);
+
+    await mead.transfer(staking.address, initialSupply.div(10));
+    await mead.connect(alice).approve(purchaser.address, ethers.constants.MaxUint256);
+    await LP.transfer(alice.address, await LP.balanceOf(deployer.address));
+    await LP.connect(alice).approve(staking.address, ethers.constants.MaxUint256);
+    await staking.connect(alice).deposit(await LP.balanceOf(alice.address));
+    await mineBlocks(10000000);
+
+    const discount = await purchaser.conversionDiscount();
+    const meadCost = await settings.breweryCost();
+    const actualCost = meadCost.sub(meadCost.mul(discount).div(1e4));
+
+    const rewardAmount = (await staking.pendingRewards(alice.address)).add(rewardPerBlock);
+
+    let expectedCount = rewardAmount.div(actualCost).toNumber();
+    if (expectedCount > walletLimit) {
+      expectedCount = walletLimit;
+    }
+    const claimedFund = rewardAmount.sub(actualCost.mul(expectedCount));
+
+    const alice0 = await mead.balanceOf(alice.address);
+    await purchaser.connect(alice).compoundPendingStakeRewardsIntoBrewerys(staking.address);
+    const alice1 = await mead.balanceOf(alice.address);
+    
+    // expect(alice1.sub(alice0)).to.be.equal(claimedFund);
+    expect(await brewery.balanceOf(alice.address)).to.be.equal(expectedCount);
+
+    console.log("Compounded", expectedCount, "breweries from", rewardAmount.toString(), "Meads");
+    console.log(claimedFund.toString(), "Meads are claimed to wallet");
   });
 
   after(async () => {

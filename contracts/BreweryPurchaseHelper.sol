@@ -220,22 +220,22 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
      * @notice Compounds the staking pending MEAD rewards into BREWERYs
      */
     function compoundPendingStakeRewardsIntoBrewerys(address stakingAddress) external {
-        TavernStaking staking = TavernStaking(stakingAddress);
-        uint256 pendingRewards = staking.pendingRewards(msg.sender);
-
-        // Calculate the cost of a BREWERY for compounding (with converting)
-        uint256 breweryCostWithDiscount = settings.breweryCost() - settings.breweryCost() * conversionDiscount / 1e4;
-        require(pendingRewards >= breweryCostWithDiscount, "Not enough rewards to compound");
-
         // Withdraw the rewards
         uint256 balanceBefore = Mead(settings.mead()).balanceOf(msg.sender);
-        TavernStaking(stakingAddress).harvest(msg.sender);
+        TavernStaking(stakingAddress).harvestOnBehalf(msg.sender);
         uint256 claimed = Mead(settings.mead()).balanceOf(msg.sender) - balanceBefore;
 
         // Find out how many brewerys we can afford
+        // Calculate the cost of a BREWERY for compounding (with converting)
+        uint256 breweryCostWithDiscount = settings.breweryCost() - settings.breweryCost() * conversionDiscount / 1e4;
         uint256 breweryAmount = claimed / breweryCostWithDiscount;
-
         require(breweryAmount > 0, "Not enough rewards to compound");
+
+        uint256 maximumAllowed = settings.walletLimit() - brewery.balanceOf(msg.sender);
+        require(maximumAllowed > 0, "You can't compound more due to wallet limit");
+        if (breweryAmount > maximumAllowed) {
+            breweryAmount = maximumAllowed;
+        }
 
         uint256 meadAmount = breweryAmount * breweryCostWithDiscount;
 
@@ -277,6 +277,12 @@ contract BreweryPurchaseHelper is Initializable, OwnableUpgradeable {
         uint256 discountedPrice = breweryPriceInLP * (1e4 - discount) / 1e4;
         discountedPrice = discountedPrice - discountedPrice * conversionDiscount / 1e4;
         uint256 breweryAmount = stakeAmount / discountedPrice;
+
+        uint256 maximumAllowed = settings.walletLimit() - brewery.balanceOf(msg.sender);
+        require(maximumAllowed > 0, "You can't compound more due to wallet limit");
+        if (breweryAmount > maximumAllowed) {
+            breweryAmount = maximumAllowed;
+        }
 
         // Send the LP tokens from the account transacting this function to the taverns keep
         // as payment. The rest is then kept on the person (dust)
