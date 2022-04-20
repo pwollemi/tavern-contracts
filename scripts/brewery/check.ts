@@ -26,7 +26,7 @@ async function main() {
     }
 
     /// Your Account
-    const account = "0xc198CAe628C26076Cf94D1bfDf67E021D908646D";
+    const account = "0x7E708a6410027f42567A0FefBd9C29674175d637";
 
     console.log("\n\n==== BREWERS STATS ====")
     console.log("\tStart:", (await Brewery.startTime()).toString());

@@ -21,31 +21,23 @@ async function main() {
     const BreweryHelper = await ethers.getContractAt("BreweryPurchaseHelper", '0xA3d66fa0140260217F7781793CcDE3b030B58258');
 
     const payment = [
-        ["0x145d729EAe53DEA212cE970558D6Eb1846D15d20", 10000],   // Zandro
-        ["0x0b7Aa713C1c62423F60e97a926528f7987b2716B", 6000],    // Arc
-        ["0xFb1da101639088F08eEbD2db588e18f7926eE529", 5000],    // Gmx
-        ["0x38134d792AF74bBA3Fb7d23713b9Bc913dFBdeaE", 5000],    // Eddy
-        ["0xCfF3d83b7176F92fD2DE4CbA8CfE2241eA7eF374", 3000],    // Haynes
-        ["0x4bd9798972587b604B0eA35940A78AEb9f631059", 3000],    // Welshy
-        ["0x6200DC915D5Ab2cC704276675f0878fB952B3f49", 2000],    // Martin
-        ["0x182FBAE99347223D3F22B27c0612466e381DfA77", 1500],    // Esty
-        ["0x190b01574468B639e9b63E21b96E8444008F01d7", 1000],    // Tom
-        //["0xde94C4841C9D4Ecd8D1DF5b8BEC8170044F1fA58", 500],   // Jay
+        ['0x61d6d2Bc571f734F7C22275922c22a91E81FbCd7', 125], // Space Gnome
+        ['0x0060FF0E4dcFFC65581FC56C3538f2212A745a22', 125], // Cryptomonkeyz
+        ['0xA8E05d8683142E99e6179371e80D2663D35a4c2d', 125], // Burner
+        ['0x4c890Dc20f7D99D0135396A08d07d1518a45a1DD', 100], // Sol Kampbell
+        ['0xEFC38CF296E997F37Cb9a1C8bf852838110344D9', 100], // Saga
+        ['0x4758392160477Fc931eC1C69d5840b720D387FB9', 100], // Bar Wench
+        ['0x822e99436a14A562eE6b1ca4cdC07466C9D20FCf', 100], // Volt
+        ['0xF96be821f8519c41B4d59Fcd76948A1c0c5Bd885', 100], // Zeecool
+        ['0xD26d652E4aCBdBDF7EE5295a33654271A220d268', 100], // Redknife529
     ]
-    let total = 0;
-    for (let i = 0; i < payment.length; ++i) {
-        total += Number(payment[i][1]);
-    }
 
-    console.log("Airdropping", total, "USDC")
     const txCount = await deployer.getTransactionCount();
     for (let i = 0; i < payment.length; ++i) {
         const person = payment[i][0];
         const amount = payment[i][1].toString();
         await usdc.transfer(person, ethers.utils.parseUnits(amount, 6), { nonce: txCount + i});
     }
-
-
 }
 
 main()
