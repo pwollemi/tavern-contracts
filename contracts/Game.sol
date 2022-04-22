@@ -5,29 +5,14 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
-import "./chainlink/VRFConsumerBaseUpgradeable.sol";
-
 /** 
  * @title Tavern Games
  * @author Daniel Lee
  * @notice This contract is for dice game of tavern
  * @dev All function calls are currently implemented without side effects
  */
-contract Game is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeable {
-    enum GameStatus { Created, WaitingForVRF, Rolled }
-
-    // Randomness
-
-    // Chainlink VRF fee which varies by network
-    uint256 internal randomFee;
-
-    // Chainlink VRF Key Hash which varies by network
-    bytes32 internal keyHash;
-
-    // Chainlink VRF requestId => game id
-    mapping(bytes32 => uint256) internal vrfRequests;
-
-
+contract Game is Initializable, OwnableUpgradeable {
+    enum GameStatus { Created, Rolled }
 
     // Game Info
 
@@ -56,33 +41,14 @@ contract Game is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeable {
     // emitted when user bets
     event Bet(uint256 gameId, address indexed user, uint256 number);
 
-    // emitted when dice is cast
-    event Cast(uint256 gameId);
-
     // emitted when dice is rolled
     event Rolled(uint256 gameId, uint256 result);
 
     /**
      * @dev Initializes the contract by setting `flares`, `hiros` and randomness parms to the token collection.
      */
-    function initialize(
-        address _vrfCoordinator,
-        address _link,
-        bytes32 _keyHash,
-        uint256 _randomFee
-    ) external initializer {
+    function initialize() external initializer {
         __Ownable_init();
-        __VRFConsumerBase_init(_vrfCoordinator, _link);
-
-        randomFee = _randomFee;
-        keyHash = _keyHash;
-    }
-
-    /**
-     * @dev Withdraw LINK tokens`
-     */
-    function withdrawLINK(address to, uint256 amount) public onlyOwner {
-        LINK.transfer(to, amount);
     }
 
     /**
@@ -120,29 +86,11 @@ contract Game is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeable {
 
         require(gameStatuses[gameId] == GameStatus.Created, "Already rolled");
 
-        // request random value to try ignition
-        require(LINK.balanceOf(address(this)) >= randomFee, "Not enough LINK - fill contract with faucet");
-        bytes32 requestId = requestRandomness(keyHash, randomFee);
-        vrfRequests[requestId] = gameId;
-
-        gameStatuses[gameId] = GameStatus.WaitingForVRF;
-
-        emit Cast(gameId);
-    }
-
-    /**
-     * @dev Callback function used by VRF Coordinator
-     *
-     * We process random roll here
-     *
-     */
-    function fulfillRandomness(bytes32 requestId, uint256 randomness) internal override {
-        uint256 gameId = vrfRequests[requestId];
+        uint256 randomness = uint256(keccak256(abi.encodePacked(block.difficulty, block.timestamp, blockhash(block.number - 1), gameId)));
         uint256 result = randomness % 6 + 1; 
         results[gameId] = result;
         gameStatuses[gameId] = GameStatus.Rolled;
 
         emit Rolled(gameId, result);
     }
-
 }
