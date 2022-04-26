@@ -110,7 +110,7 @@ contract Game is Initializable, OwnableUpgradeable {
     }
 
     /**
-     * @dev Create new game
+     * @dev Create new bets
      */
     function betOnGame(uint256 gameId, BetOption option, uint256 amount) public {
         require(gameId <= totalGames, "Game doesn't exist");
@@ -126,9 +126,6 @@ contract Game is Initializable, OwnableUpgradeable {
 
     /**
      * @dev roll the dice
-     *
-     * We assume chainlink VRF always correctly works
-     *
      */
     function roll(uint256 gameId) public notContract {
         GameInfo storage game = games[gameId];
@@ -180,6 +177,9 @@ contract Game is Initializable, OwnableUpgradeable {
         return 0;
     }
 
+    /**
+     * @dev Claims winning rewards
+     */
     function claimWinAmount(uint256 gameId) external notContract {
         uint256 amount = getWinAmount(gameId, msg.sender);
         bets[gameId][msg.sender].claimed = true;
