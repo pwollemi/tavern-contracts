@@ -26,7 +26,7 @@ contract GameVRF is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeabl
         // Roll time of each game
         uint256 rollAfter;
         // Roll time of each game. (gameId => result)
-        uint256[2] results;
+        uint256[6] results;
     }
     
     struct BetInfo {
@@ -75,7 +75,7 @@ contract GameVRF is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeabl
     event Cast(uint256 gameId);
 
     // emitted when dice is rolled
-    event Rolled(uint256 gameId, uint256 result1, uint256 result2);
+    event Rolled(uint256 gameId, uint256[6] results);
 
     // emitted when user claims winning rewards
     event ClaimReward(uint256 gameId, address indexed user, uint256 reward);
@@ -150,6 +150,8 @@ contract GameVRF is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeabl
     function betOnGame(uint256 gameId, BetOption option, uint256 amount) public {
         require(gameId <= totalGames, "Game doesn't exist");
         require(games[gameId].status == GameStatus.Created, "Dice is already rolled");
+        require(amount > 0, "Invalid zero amount");
+        require(bets[gameId][msg.sender].amount == 0, "Already bet");
 
         IERC20Upgradeable(mead).safeTransferFrom(msg.sender, address(this), amount);
 
@@ -189,15 +191,22 @@ contract GameVRF is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeabl
      */
     function fulfillRandomness(bytes32 requestId, uint256 randomness) internal override {
         uint256 gameId = vrfRequests[requestId];
-        uint256 result2 = (randomness / 6) % 6 + 1; 
-        uint256 result1 = randomness % 6 + 1; 
-
         GameInfo storage game = games[gameId];
-        game.results[0] = result1;
-        game.results[1] = result2;
+
+        game.results[0] = randomness % 6 + 1;
+        randomness = randomness / 6;
+        game.results[1] = randomness % 6 + 1;
+        randomness = randomness / 6;
+        game.results[2] = randomness % 6 + 1;
+        randomness = randomness / 6;
+        game.results[3] = randomness % 6 + 1;
+        randomness = randomness / 6;
+        game.results[4] = randomness % 6 + 1;
+        randomness = randomness / 6;
+        game.results[5] = randomness % 6 + 1;
         game.status = GameStatus.Rolled;
 
-        emit Rolled(gameId, result1, result2);
+        emit Rolled(gameId, game.results);
     }
 
 
@@ -212,23 +221,26 @@ contract GameVRF is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeabl
         require(game.status == GameStatus.Rolled, "Not rolled yet");
 
         if (bet.option == BetOption.EVEN) {
-            if ((game.results[0] + game.results[1]) % 2 == 0) {
-                return bet.amount * 2;
+            for (uint256 i = 0; i < 6; i += 1) {
+                if (game.results[i] % 2 == 1) {
+                    return 0;
+                }
             }
-            return 0;
+            return bet.amount * 2;
         } 
         if (bet.option == BetOption.ODD) {
-            if ((game.results[0] + game.results[1]) % 2 == 1) {
-                return bet.amount * 2;
+            for (uint256 i = 0; i < 6; i += 1) {
+                if (game.results[i] % 2 == 0) {
+                    return 0;
+                }
             }
-            return 0;
+            return bet.amount * 2;
         } 
         if (bet.option == BetOption.ACES) {
-            if (game.results[0] != 1 || game.results[0] != 2) {
-                return 0;
-            }
-            if (game.results[1] != 1 || game.results[1] != 2) {
-                return 0;
+            for (uint256 i = 0; i < 6; i += 1) {
+                if (game.results[i] != 1 && game.results[i] != 2) {
+                    return 0;
+                }
             }
             return bet.amount * 7;
         }
