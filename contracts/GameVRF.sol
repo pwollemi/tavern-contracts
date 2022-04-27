@@ -25,7 +25,7 @@ contract GameVRF is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeabl
         GameStatus status;
         // Roll time of each game
         uint256 rollAfter;
-        // Roll time of each game. (gameId => result)
+        // Result
         uint256[6] results;
     }
     
@@ -102,6 +102,14 @@ contract GameVRF is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeabl
     }
 
     /**
+     * @notice Checks if the gameId is valid
+     */
+    modifier isValidGameId(uint256 gameId) {
+        require(gameId <= totalGames, "Invalid game id");
+        _;
+    }
+
+    /**
      * @dev Initializes the contract by setting `flares`, `hiros` and randomness parms to the token collection.
      */
     function initialize(
@@ -147,8 +155,7 @@ contract GameVRF is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeabl
     /**
      * @dev Create new bets
      */
-    function betOnGame(uint256 gameId, BetOption option, uint256 amount) public {
-        require(gameId <= totalGames, "Game doesn't exist");
+    function betOnGame(uint256 gameId, BetOption option, uint256 amount) public isValidGameId(gameId) {
         require(games[gameId].status == GameStatus.Created, "Dice is already rolled");
         require(amount > 0, "Invalid zero amount");
         require(bets[gameId][msg.sender].amount == 0, "Already bet");
@@ -167,10 +174,10 @@ contract GameVRF is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeabl
      * We assume VRF always correctly works
      *
      */
-    function roll(uint256 gameId) public {
+    function roll(uint256 gameId) public isValidGameId(gameId) {
         GameInfo storage game = games[gameId];
 
-        require(game.rollAfter >= block.timestamp, "Not roll time");
+        require(game.rollAfter <= block.timestamp, "Not roll time");
         require(game.status == GameStatus.Created, "Already rolled");
 
         // request random value to try ignition
@@ -209,6 +216,12 @@ contract GameVRF is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeabl
         emit Rolled(gameId, game.results);
     }
 
+    /**
+     * @notice Return game roll results
+     */
+    function getResults(uint256 gameId) external view isValidGameId(gameId) returns (uint256[6] memory) {
+        return games[gameId].results;
+    }
 
     /**
      * @dev return win amount of the user at game
@@ -250,7 +263,7 @@ contract GameVRF is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeabl
     /**
      * @dev Claims winning rewards
      */
-    function claimWinAmount(uint256 gameId) external notContract {
+    function claimWinAmount(uint256 gameId) external notContract isValidGameId(gameId) {
         uint256 amount = getWinAmount(gameId, msg.sender);
         bets[gameId][msg.sender].claimed = true;
         IERC20Upgradeable(mead).safeTransfer(msg.sender, amount);

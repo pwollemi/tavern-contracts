@@ -23,7 +23,7 @@ contract Game is Initializable, OwnableUpgradeable {
         GameStatus status;
         // Roll time of each game
         uint256 rollAfter;
-        // Roll time of each game. (gameId => result)
+        // Result
         uint256[6] results;
     }
     
@@ -83,6 +83,14 @@ contract Game is Initializable, OwnableUpgradeable {
     }
 
     /**
+     * @notice Checks if the gameId is valid
+     */
+    modifier isValidGameId(uint256 gameId) {
+        require(gameId <= totalGames, "Invalid game id");
+        _;
+    }
+
+    /**
      * @dev Initializes the contract by setting `flares`, `hiros` and randomness parms to the token collection.
      */
     function initialize(address _mead) external initializer {
@@ -112,8 +120,7 @@ contract Game is Initializable, OwnableUpgradeable {
     /**
      * @dev Create new bets
      */
-    function betOnGame(uint256 gameId, BetOption option, uint256 amount) public {
-        require(gameId <= totalGames, "Game doesn't exist");
+    function betOnGame(uint256 gameId, BetOption option, uint256 amount) public isValidGameId(gameId) {
         require(games[gameId].status == GameStatus.Created, "Dice is already rolled");
         require(amount > 0, "Invalid zero amount");
         require(bets[gameId][msg.sender].amount == 0, "Already bet");
@@ -129,13 +136,13 @@ contract Game is Initializable, OwnableUpgradeable {
     /**
      * @dev roll the dice
      */
-    function roll(uint256 gameId) public notContract {
+    function roll(uint256 gameId) public notContract isValidGameId(gameId) {
         GameInfo storage game = games[gameId];
 
-        require(game.rollAfter >= block.timestamp, "Not roll time");
+        require(game.rollAfter <= block.timestamp, "Not roll time");
         require(game.status == GameStatus.Created, "Already rolled");
 
-        uint256 randomness = uint256(keccak256(abi.encodePacked(block.difficulty, block.timestamp, blockhash(block.number - 1), gameId))) % 6 + 1; 
+        uint256 randomness = uint256(keccak256(abi.encodePacked(block.difficulty, block.timestamp, blockhash(block.number - 1)))); 
 
         game.results[0] = randomness % 6 + 1;
         randomness = randomness / 6;
@@ -151,6 +158,13 @@ contract Game is Initializable, OwnableUpgradeable {
         game.status = GameStatus.Rolled;
 
         emit Rolled(gameId, game.results);
+    }
+
+    /**
+     * @notice Return game roll results
+     */
+    function getResults(uint256 gameId) external view isValidGameId(gameId) returns (uint256[6] memory) {
+        return games[gameId].results;
     }
 
     /**
@@ -193,7 +207,7 @@ contract Game is Initializable, OwnableUpgradeable {
     /**
      * @dev Claims winning rewards
      */
-    function claimWinAmount(uint256 gameId) external notContract {
+    function claimWinAmount(uint256 gameId) external notContract isValidGameId(gameId) {
         uint256 amount = getWinAmount(gameId, msg.sender);
         bets[gameId][msg.sender].claimed = true;
         IERC20Upgradeable(mead).safeTransfer(msg.sender, amount);
