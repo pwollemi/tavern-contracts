@@ -38,6 +38,18 @@ contract GameVRF is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeabl
         bool claimed;
     }
 
+    struct BetPlayerInfo {
+        // Bet option
+        BetOption option;
+        // Bet amount
+        uint256 amount;
+        // Claimed
+        bool claimed;
+        // gameId
+        uint256 gameId;
+        // winAmount
+        uint256 winAmount;
+    }
     // Randomness
 
     // Chainlink VRF fee which varies by network
@@ -64,6 +76,8 @@ contract GameVRF is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeabl
     // Betting status of each user. (gameId => user => Bet)
     mapping(uint256 => mapping(address => BetInfo)) public bets;
 
+    // GameId where the player has bet
+    mapping(address => uint256[]) playerBets;
 
     // emitted when dice is rolled
     event GameCreated(uint256 gameId, uint256 rollAfter);
@@ -145,6 +159,7 @@ contract GameVRF is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeabl
      * @dev Create new game
      */
     function createGame(uint256 _rollAfter) public {
+        require(_rollAfter < block.timestamp + 1 days, "Max 1 day between game");
         totalGames = totalGames + 1;
         games[totalGames].status = GameStatus.Created;
         games[totalGames].rollAfter = _rollAfter;
@@ -164,8 +179,45 @@ contract GameVRF is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeabl
 
         bets[gameId][msg.sender].amount = amount;
         bets[gameId][msg.sender].option = option;
+        playerBets[msg.sender].push(gameId);
 
         emit Bet(gameId, msg.sender, option, amount);
+    }
+
+    /**
+     * @dev get bets by player
+     */
+    function fetchPlayerBets(address player, uint256 cursor, uint256 howMany) public view returns (BetPlayerInfo[] memory values, uint256 newCursor) {
+        uint256 length = howMany;
+        uint256[] storage betsForPlayer = playerBets[player];
+        if (length > betsForPlayer.length - cursor) {
+            length = betsForPlayer.length - cursor;
+        }
+
+        values = new BetPlayerInfo[](length);
+        for (uint256 i = 0; i < length; i++) {
+            uint256 index = betsForPlayer[cursor + i];
+            BetInfo storage betInfo = bets[index][player];
+            values[i] = BetPlayerInfo({option: betInfo.option, amount : betInfo.amount, claimed : betInfo.claimed, gameId : index, winAmount : getWinAmount(index, player)});
+        }
+
+        return (values, cursor + length);
+    }
+
+    /**
+     * @dev count bets by player
+     */
+    function countPlayerBets(address player) public view returns (uint256) {
+        return playerBets[player].length;
+    }
+
+    /**
+     * @dev get next roll in second
+     */
+    function getNextRoll() public view returns(uint256) {
+        GameInfo storage game = games[totalGames-1];
+        require(game.status == GameStatus.Created, "Dice is already rolled");
+        return game.rollAfter > block.timestamp ? game.rollAfter - block.timestamp : 0;
     }
 
     /**
