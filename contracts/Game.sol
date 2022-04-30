@@ -47,6 +47,8 @@ contract Game is Initializable, OwnableUpgradeable {
         uint256 gameId;
         // winAmount
         uint256 winAmount;
+        // results
+        uint256[6] results;
     }
 
     // MEAD token
@@ -153,7 +155,11 @@ contract Game is Initializable, OwnableUpgradeable {
     /**
      * @dev get bets by player
      */
-    function fetchPlayerBets(address player, uint256 cursor, uint256 howMany) public view returns (BetPlayerInfo[] memory values, uint256 newCursor) {
+    function fetchPlayerBets(
+        address player,
+        uint256 cursor,
+        uint256 howMany
+    ) public view returns (BetPlayerInfo[] memory values, uint256 newCursor) {
         uint256 length = howMany;
         uint256[] storage betsForPlayer = playerBets[player];
         if (length > betsForPlayer.length - cursor) {
@@ -164,7 +170,14 @@ contract Game is Initializable, OwnableUpgradeable {
         for (uint256 i = 0; i < length; i++) {
             uint256 index = betsForPlayer[cursor + i];
             BetInfo storage betInfo = bets[index][player];
-            values[i] = BetPlayerInfo({option: betInfo.option, amount : betInfo.amount, claimed : betInfo.claimed, gameId : index, winAmount : getWinAmount(index, player)});
+            values[i].option = betInfo.option;
+            values[i].amount = betInfo.amount;
+            values[i].claimed = betInfo.claimed;
+            values[i].gameId = index;
+            if (games[index].status == GameStatus.Rolled) {
+                values[i].winAmount = getWinAmount(index, player);
+                values[i].results = games[index].results;
+            }
         }
 
         return (values, cursor + length);
