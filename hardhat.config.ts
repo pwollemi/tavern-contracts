@@ -54,24 +54,16 @@ const config: HardhatUserConfig = {
       forking: {
         url: process.env.AVAX_MAINNET,
       },
-      accounts: [
-        {
-          privateKey: process.env.PRIVATE_KEY,
-          balance: '1000000000000000000000000'
-        },
-        {
-          privateKey: process.env.PRIVATE_KEY2,
-          balance: '1000000000000000000000000'
-        },
-        {
-          privateKey: process.env.PRIVATE_KEY3,
-          balance: '1000000000000000000000000'
-        },
-        {
-          privateKey: process.env.PRIVATE_KEY4,
-          balance: '1000000000000000000000000'
-        }
-      ],
+      // accounts: [
+      //   {
+      //     privateKey: process.env.PRIVATE_KEY2,
+      //     balance: '1000000000000000000000000'
+      //   }, 
+      //   {
+      //     privateKey: process.env.PRIVATE_KEY,
+      //     balance: '1000000000000000000000000'
+      //   }
+      // ],
     },
     avaxmainnet: {
       url: process.env.AVAX_MAINNET,
