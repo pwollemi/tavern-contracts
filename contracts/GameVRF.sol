@@ -298,19 +298,19 @@ contract GameVRF is Initializable, OwnableUpgradeable, VRFConsumerBaseUpgradeabl
         require(bet.amount > 0, "No bet");
         require(game.status == GameStatus.Rolled, "Not rolled yet");
 
+        uint256 totalSum = 0;
+        for (uint256 i = 0; i < 6; i += 1) {
+            totalSum = totalSum + game.results[i];
+        }
         if (bet.option == BetOption.EVEN) {
-            for (uint256 i = 0; i < 6; i += 1) {
-                if (game.results[i] % 2 == 1) {
-                    return 0;
-                }
+            if (totalSum % 2 == 1) {
+                return 0;
             }
             return bet.amount * 2;
         } 
         if (bet.option == BetOption.ODD) {
-            for (uint256 i = 0; i < 6; i += 1) {
-                if (game.results[i] % 2 == 0) {
-                    return 0;
-                }
+            if (totalSum % 2 == 0) {
+                return 0;
             }
             return bet.amount * 2;
         } 
