@@ -274,6 +274,8 @@ contract Game is Initializable, OwnableUpgradeable {
      * @dev Claims winning rewards
      */
     function claimWinAmount(uint256 gameId) external notContract isValidGameId(gameId) {
+        require(bets[gameId][msg.sender].claimed == false, "already claimed");
+
         uint256 amount = getWinAmount(gameId, msg.sender);
         bets[gameId][msg.sender].claimed = true;
         IERC20Upgradeable(mead).safeTransfer(msg.sender, amount);
