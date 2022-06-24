@@ -6,6 +6,19 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721Enumer
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
+    struct BreweryStatus {
+        // Mead amount in Brewery; it's not total mead, should add pending mead for total mead
+        uint256 mead;
+        // Points gained by Brewery
+        uint256 points;
+        // Valve close/open status
+        bool isValveOpened;
+        // Last valve updated timestamp
+        uint256 lastUpdatedAt;
+        // Production rate of Mead
+        uint256 meadPerSecond;
+    }
+
     struct Lobby {
         // joined user
         address joiner;
@@ -15,10 +28,18 @@ contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
         uint256 startTime;
         // amount in mead
         uint256 betAmount;
+
+        // Creator's Mead in land
+        uint256 creatorMeadInLand;
+        // Joiner's Mead in land
+        uint256 joinerMeadInLand;
     }
 
     /// @notice lobbies data
     mapping(uint256 => Lobby) public lobbies;
+
+    /// @notice breweries
+    mapping(uint256 => mapping(address => BreweryStatus)) public breweries;
 
     /// @notice mead token
     IERC20Upgradeable public mead;
@@ -50,7 +71,9 @@ contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
     }
 
     modifier isInProgress(uint256 lobbyId) {
-       require(lobbies[lobbyId].startTime <= block.timestamp && lobbies[lobbyId].startTime + 5 minutes > block.timestamp, "Lobby is not in progress");
+        require(lobbies[lobbyId].joiner != address(0), "Nobody joined");
+        require(lobbies[lobbyId].isCanceled == false, "Lobby is canceled");
+        require(lobbies[lobbyId].startTime <= block.timestamp && lobbies[lobbyId].startTime + 5 minutes > block.timestamp, "Lobby is not in progress");
         _;
     }
 
@@ -61,6 +84,12 @@ contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
         mead = _mead;
     }
 
+    //////////////////////////////////////////////////////////////////////
+    //                                                                  //
+    //                          Lobby Management                        //
+    //                                                                  //
+    //////////////////////////////////////////////////////////////////////
+
     /**
      * @notice Created a new lobby
      * @dev Emits creation event
@@ -69,7 +98,7 @@ contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
         require(startTime > block.timestamp, "startTime must be in the future");
         uint256 newId = totalSupply() + 1;
         _mint(_msgSender(), newId);
-        lobbies[newId] = Lobby(address(0), false, startTime, betAmount);
+        lobbies[newId] = Lobby(address(0), false, startTime, betAmount, 0, 0);
 
         mead.transferFrom(_msgSender(), address(this), betAmount);
         
@@ -126,5 +155,30 @@ contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
         mead.transfer(_msgSender(), lobby.betAmount);
 
         emit LobbyUnjoined(lobbyId);
+    }
+
+    //////////////////////////////////////////////////////////////////////
+    //                                                                  //
+    //                          Game Logic                              //
+    //                                                                  //
+    //////////////////////////////////////////////////////////////////////
+
+    function totalMead(uint256 lobbyId, address owner) public view returns (int256) {
+
+    }
+
+    function updateMead(uint256 lobbyId, address owner) public {
+        BreweryStatus storage brewery = breweries[lobbyId][owner];
+        brewery.lastUpdatedAt = block.timestamp;
+    }
+
+    function openLever(uint256 lobbyId, bool isValveOpened) public isInProgress(lobbyId) {
+        updateMead(lobbyId, _msgSender());
+
+        Lobby memory lobby = lobbies[lobbyId];
+        require(ownerOf(lobbyId) == _msgSender() || lobby.joiner == _msgSender(), "Not part of the game");
+        BreweryStatus storage brewery = breweries[lobbyId][_msgSender()];
+        require(brewery.isValveOpened != isValveOpened, "Same status update");
+        brewery.isValveOpened = isValveOpened;
     }
 }
