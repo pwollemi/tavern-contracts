@@ -17,6 +17,8 @@ contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
         uint256 lastUpdatedAt;
         // Production rate of Mead
         uint256 meadPerSecond;
+        // Flow rate of mead
+        uint256 flowRate;
     }
 
     struct Lobby {
@@ -163,22 +165,49 @@ contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
     //                                                                  //
     //////////////////////////////////////////////////////////////////////
 
+    /**
+     * @notice Mead amount inside Brewery
+     * @dev totalMead = stored Mead + pending Mead - Flowed Mead
+     */
     function totalMead(uint256 lobbyId, address owner) public view returns (int256) {
-
     }
 
-    function updateMead(uint256 lobbyId, address owner) public {
-        BreweryStatus storage brewery = breweries[lobbyId][owner];
-        brewery.lastUpdatedAt = block.timestamp;
-    }
-
-    function openLever(uint256 lobbyId, bool isValveOpened) public isInProgress(lobbyId) {
-        updateMead(lobbyId, _msgSender());
+    /**
+     * @notice Open/close mead lever
+     * @dev it's only flowed mead since lastUpdatedAt
+     */
+    function toggleLever(uint256 lobbyId, bool isValveOpened) public isInProgress(lobbyId) {
+        _updateMead(lobbyId, _msgSender());
 
         Lobby memory lobby = lobbies[lobbyId];
         require(ownerOf(lobbyId) == _msgSender() || lobby.joiner == _msgSender(), "Not part of the game");
         BreweryStatus storage brewery = breweries[lobbyId][_msgSender()];
         require(brewery.isValveOpened != isValveOpened, "Same status update");
         brewery.isValveOpened = isValveOpened;
+    }
+
+    /**
+     * @notice Mead amount produced in Brewery
+     * @dev it's only produced amount
+     */
+    function _pendingMead(uint256 lobbyId, address owner) public view returns (int256) {
+
+    }
+
+    /**
+     * @notice Mead amount flowed already
+     * @dev it's only flowed mead since lastUpdatedAt
+     */
+    function _flowedMead(uint256 lobbyId, address owner) public view returns (int256) {
+
+    }
+
+    /**
+     * @notice Update mead amount produced in Brewery
+     * @dev Convert pending mead into stored mead amount
+     */
+    function _updateMead(uint256 lobbyId, address owner) internal {
+        BreweryStatus storage brewery = breweries[lobbyId][owner];
+        brewery.lastUpdatedAt = block.timestamp;
     }
 }
