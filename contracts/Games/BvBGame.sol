@@ -18,7 +18,9 @@ contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
         // Production rate of Mead
         uint256 meadPerSecond;
         // Flow rate of mead
-        uint256 flowRate;
+        uint256 flowRatePerSecond;
+        // Points Per second
+        uint256 pointsPerSecond;
     }
 
     struct Lobby {
@@ -169,7 +171,9 @@ contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
      * @notice Mead amount inside Brewery
      * @dev totalMead = stored Mead + pending Mead - Flowed Mead
      */
-    function totalMead(uint256 lobbyId, address owner) public view returns (int256) {
+    function totalMead(uint256 lobbyId, address owner) public view returns (uint256) {
+        BreweryStatus memory brewery = breweries[lobbyId][owner];
+        return brewery.mead + pendingMead(lobbyId, owner) - flowedMead(lobbyId, owner);
     }
 
     /**
@@ -177,7 +181,7 @@ contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
      * @dev it's only flowed mead since lastUpdatedAt
      */
     function toggleLever(uint256 lobbyId, bool isValveOpened) public isInProgress(lobbyId) {
-        _updateMead(lobbyId, _msgSender());
+        _updateBrewery(lobbyId, _msgSender());
 
         Lobby memory lobby = lobbies[lobbyId];
         require(ownerOf(lobbyId) == _msgSender() || lobby.joiner == _msgSender(), "Not part of the game");
@@ -190,24 +194,50 @@ contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
      * @notice Mead amount produced in Brewery
      * @dev it's only produced amount
      */
-    function _pendingMead(uint256 lobbyId, address owner) public view returns (int256) {
+    function pendingMead(uint256 lobbyId, address owner) public view returns (uint256) {
+        BreweryStatus memory brewery = breweries[lobbyId][owner];
+        if (!brewery.isValveOpened) {
+            return (block.timestamp - brewery.lastUpdatedAt) * brewery.meadPerSecond;
+        }
+        return 0;
+    }
 
+    /**
+     * @notice Mead amount produced in Brewery
+     * @dev it's only produced amount
+     */
+    function pendingPoints(uint256 lobbyId, address owner) public view returns (uint256) {
+        BreweryStatus memory brewery = breweries[lobbyId][owner];
+        if (!brewery.isValveOpened) {
+            return (block.timestamp - brewery.lastUpdatedAt) * brewery.pointsPerSecond;
+        }
+        return 0;
     }
 
     /**
      * @notice Mead amount flowed already
-     * @dev it's only flowed mead since lastUpdatedAt
+     * @dev it's only flowed mead since lastUpdatedAt, but if exceeds the stored Mead, should return zero
      */
-    function _flowedMead(uint256 lobbyId, address owner) public view returns (int256) {
-
+    function flowedMead(uint256 lobbyId, address owner) public view returns (uint256) {
+        BreweryStatus memory brewery = breweries[lobbyId][owner];
+        if (brewery.isValveOpened) {
+            uint256 _flowedMead = (block.timestamp - brewery.lastUpdatedAt) * brewery.flowRatePerSecond;
+            if (_flowedMead > brewery.mead) {
+                _flowedMead = brewery.mead;
+            }
+            return _flowedMead;
+        }
+        return 0;
     }
 
     /**
      * @notice Update mead amount produced in Brewery
      * @dev Convert pending mead into stored mead amount
      */
-    function _updateMead(uint256 lobbyId, address owner) internal {
+    function _updateBrewery(uint256 lobbyId, address owner) internal {
         BreweryStatus storage brewery = breweries[lobbyId][owner];
         brewery.lastUpdatedAt = block.timestamp;
+        brewery.mead = totalMead(lobbyId, owner);
+        brewery.points = brewery.pointsPerSecond;
     }
 }
