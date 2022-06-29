@@ -2,13 +2,16 @@ pragma solidity ^0.8.4;
 pragma abicoder v2;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
-contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
+contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeable {
     struct BreweryStatus {
         // Mead amount in Brewery; it's not total mead, should add pending mead for total mead
         uint256 mead;
+        // Mead amount out from Brewery; should add flowed mead
+        uint256 outMead;
         // Points gained by Brewery
         uint256 points;
         // Valve close/open status
@@ -30,14 +33,16 @@ contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
         bool isCanceled;
         // game start time
         uint256 startTime;
+        // game end time
+        uint256 endTime;
         // amount in mead
         uint256 betAmount;
-
-        // Creator's Mead in land
-        uint256 creatorMeadInLand;
-        // Joiner's Mead in land
-        uint256 joinerMeadInLand;
+        // winner claimed
+        address claimedTo;
     }
+
+    /// @notice duration of the game: 5 mins
+    uint256 public constant GAME_DURATION = 5 minutes;
 
     /// @notice lobbies data
     mapping(uint256 => Lobby) public lobbies;
@@ -48,11 +53,18 @@ contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
     /// @notice mead token
     IERC20Upgradeable public mead;
 
+    /// @notice fee percentage in bips
+    uint256 public feePercentage;
+
+    /// @notice fee receiver
+    address public feeTo;
+
     event LobbyCreated(uint256 lobbyId, address indexed creator, uint256 startTime, uint256 amount);
     event LobbyUpdated(uint256 lobbyId, uint256 startTime);
     event LobbyCanceled(uint256 lobbyId);
     event LobbyJoined(uint256 lobbyId, address indexed joiner);
     event LobbyUnjoined(uint256 lobbyId);
+    event LobbyEnded(uint256 lobbyId, address indexed winner, uint256 timestamp);
 
     modifier notStarted(uint256 lobbyId) {
         require(lobbies[lobbyId].startTime > block.timestamp, "Lobby is alredy started");
@@ -77,16 +89,33 @@ contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
     modifier isInProgress(uint256 lobbyId) {
         require(lobbies[lobbyId].joiner != address(0), "Nobody joined");
         require(lobbies[lobbyId].isCanceled == false, "Lobby is canceled");
-        require(lobbies[lobbyId].startTime <= block.timestamp && lobbies[lobbyId].startTime + 5 minutes > block.timestamp, "Lobby is not in progress");
+        require(lobbies[lobbyId].startTime <= block.timestamp && lobbies[lobbyId].endTime > block.timestamp, "Lobby is not in progress");
         _;
     }
 
-    function initialize(IERC20Upgradeable _mead) external initializer {
+    function initialize(IERC20Upgradeable _mead, address _feeTo, uint256 _feePercentage) external initializer {
         __ERC721Enumerable_init();
+        __Ownable_init();
         __ERC721_init("BvBGame Lobby", "BvB");
 
         mead = _mead;
+        feeTo = _feeTo;
+        feePercentage = _feePercentage;
     }
+
+    //////////////////////////////////////////////////////////////////////
+    //                                                                  //
+    //                          Admin Functions                         //
+    //                                                                  //
+    //////////////////////////////////////////////////////////////////////
+
+    /**
+     * @notice Set fee info
+     */
+    function setFeeInfo(address _feeTo, uint256 _feePercentage) external onlyOwner {
+        feeTo = _feeTo;
+        feePercentage = _feePercentage;
+    }    
 
     //////////////////////////////////////////////////////////////////////
     //                                                                  //
@@ -102,7 +131,7 @@ contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
         require(startTime > block.timestamp, "startTime must be in the future");
         uint256 newId = totalSupply() + 1;
         _mint(_msgSender(), newId);
-        lobbies[newId] = Lobby(address(0), false, startTime, betAmount, 0, 0);
+        lobbies[newId] = Lobby(address(0), false, startTime, startTime + GAME_DURATION, betAmount, address(0));
 
         mead.transferFrom(_msgSender(), address(this), betAmount);
         
@@ -197,7 +226,11 @@ contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
     function pendingMead(uint256 lobbyId, address owner) public view returns (uint256) {
         BreweryStatus memory brewery = breweries[lobbyId][owner];
         if (!brewery.isValveOpened) {
-            return (block.timestamp - brewery.lastUpdatedAt) * brewery.meadPerSecond;
+            uint256 lastGameTime = lobbies[lobbyId].endTime > block.timestamp ? block.timestamp : lobbies[lobbyId].endTime;
+            if (brewery.lastUpdatedAt > lastGameTime) {
+                return 0;
+            }
+            return (lastGameTime - brewery.lastUpdatedAt) * brewery.meadPerSecond;
         }
         return 0;
     }
@@ -209,19 +242,27 @@ contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
     function pendingPoints(uint256 lobbyId, address owner) public view returns (uint256) {
         BreweryStatus memory brewery = breweries[lobbyId][owner];
         if (!brewery.isValveOpened) {
-            return (block.timestamp - brewery.lastUpdatedAt) * brewery.pointsPerSecond;
+            uint256 lastGameTime = lobbies[lobbyId].endTime > block.timestamp ? block.timestamp : lobbies[lobbyId].endTime;
+            if (brewery.lastUpdatedAt > lastGameTime) {
+                return 0;
+            }
+            return (lastGameTime - brewery.lastUpdatedAt) * brewery.pointsPerSecond;
         }
         return 0;
     }
 
     /**
-     * @notice Mead amount flowed already
+     * @notice Mead amount flowed after lastUpdatedAt
      * @dev it's only flowed mead since lastUpdatedAt, but if exceeds the stored Mead, should return zero
      */
     function flowedMead(uint256 lobbyId, address owner) public view returns (uint256) {
         BreweryStatus memory brewery = breweries[lobbyId][owner];
         if (brewery.isValveOpened) {
-            uint256 _flowedMead = (block.timestamp - brewery.lastUpdatedAt) * brewery.flowRatePerSecond;
+            uint256 lastGameTime = lobbies[lobbyId].endTime > block.timestamp ? block.timestamp : lobbies[lobbyId].endTime;
+            if (brewery.lastUpdatedAt > lastGameTime) {
+                return 0;
+            }
+            uint256 _flowedMead = (lastGameTime - brewery.lastUpdatedAt) * brewery.flowRatePerSecond;
             if (_flowedMead > brewery.mead) {
                 _flowedMead = brewery.mead;
             }
@@ -231,13 +272,78 @@ contract BvBGame is Initializable, ERC721EnumerableUpgradeable {
     }
 
     /**
+     * @notice Mead amount flowed already
+     * @dev all mead out from brewery
+     */
+    function meadFromBrewery(uint256 lobbyId, address owner) public view returns (uint256) {
+        BreweryStatus memory brewery = breweries[lobbyId][owner];
+        return brewery.outMead + flowedMead(lobbyId, owner);
+    }
+
+    /**
      * @notice Update mead amount produced in Brewery
      * @dev Convert pending mead into stored mead amount
      */
     function _updateBrewery(uint256 lobbyId, address owner) internal {
         BreweryStatus storage brewery = breweries[lobbyId][owner];
-        brewery.lastUpdatedAt = block.timestamp;
         brewery.mead = totalMead(lobbyId, owner);
-        brewery.points = brewery.pointsPerSecond;
+        brewery.points = pendingPoints(lobbyId, owner);
+        brewery.outMead = meadFromBrewery(lobbyId, owner);
+        brewery.lastUpdatedAt = block.timestamp;
+    }
+
+
+    //////////////////////////////////////////////////////////////////////
+    //                                                                  //
+    //                          Winning Logic                           //
+    //                                                                  //
+    //////////////////////////////////////////////////////////////////////
+
+    /**
+     * @notice Current winner of the game
+     * @dev If game is ended, this will return final winner of the lobby; return 0 if both the same
+     */
+    function winnerOfGame(uint256 lobbyId) public view returns (address, bool) {
+        address creator = ownerOf(lobbyId);
+        address joiner = lobbies[lobbyId].joiner;
+        uint256 creatorLand = meadFromBrewery(lobbyId, creator);
+        uint256 joinerLand = meadFromBrewery(lobbyId, joiner);
+
+        bool canbeFinal = lobbies[lobbyId].endTime < block.timestamp;
+        if (!canbeFinal) {
+            uint256 creatorLandPercent = creatorLand * 100 / (creatorLand + joinerLand);
+            // Can be final if one has 95% of land
+            canbeFinal = creatorLandPercent >= 95 || creatorLandPercent <= 5;
+        }
+
+        if (creatorLand > joinerLand) {
+            return (creator, canbeFinal);
+        }
+        if (creatorLand < joinerLand) {
+            return (joiner, canbeFinal);
+        }
+        return (address(0), canbeFinal);
+    }
+
+    /**
+     * @notice Current winner of the game
+     * @dev If game is ended, this will return final winner of the lobby; return 0 if both the same
+     */
+    function claimToWinner(uint256 lobbyId) external {
+        (address winner, bool canbeFinal) = winnerOfGame(lobbyId);
+        Lobby storage lobby = lobbies[lobbyId];
+        require(canbeFinal, "You're not final winner yet");
+        require(lobby.claimedTo == address(0), "Already claimed");
+        lobby.claimedTo = winner;
+        if (lobby.endTime > block.timestamp) {
+            lobby.endTime = block.timestamp;
+        }
+
+        uint256 totalAmount = lobby.betAmount * 2;
+        uint256 feeAmount = totalAmount * feePercentage / 1e4;
+        mead.transfer(winner, totalAmount - feeAmount);
+        mead.transfer(feeTo, feeAmount);
+
+        emit LobbyEnded(lobbyId, winner, block.timestamp);
     }
 }
