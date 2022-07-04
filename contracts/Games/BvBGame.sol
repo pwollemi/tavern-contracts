@@ -6,7 +6,9 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
-contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeable {
+import "../chainlink/VRFConsumerBaseUpgradeable.sol";
+
+contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeable, VRFConsumerBaseUpgradeable {
     struct BreweryStatus {
         // Mead amount in Brewery; it's not total mead, should add pending mead for total mead
         uint256 mead;
@@ -41,6 +43,22 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         address claimedTo;
     }
 
+    struct Catapult {
+        // chance to destroy pipes in bips
+        uint256 chance;
+        // points needed for this catapult
+        uint256 pointsNeeded;
+    }
+
+    struct CatapultRandomInfo {
+        // owner of brewery
+        address user;
+        // lobby id
+        uint256 lobbyId;
+        // type of catapult
+        uint256 catapultIndex;
+    }
+
     /// @notice duration of the game: 5 mins
     uint256 public constant GAME_DURATION = 5 minutes;
 
@@ -59,12 +77,29 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
     /// @notice fee receiver
     address public feeTo;
 
+    /// @notice catapults info
+    Catapult[] public catapults;
+
+    // VRF info
+
+    // Chainlink VRF fee which varies by network
+    uint256 internal randomFee;
+
+    // Chainlink VRF Key Hash which varies by network
+    bytes32 internal keyHash;
+
+    // Chainlink VRF requestId => catapult random info
+    mapping(bytes32 => CatapultRandomInfo) internal vrfRequests;
+
+
     event LobbyCreated(uint256 lobbyId, address indexed creator, uint256 startTime, uint256 amount);
     event LobbyUpdated(uint256 lobbyId, uint256 startTime);
     event LobbyCanceled(uint256 lobbyId);
     event LobbyJoined(uint256 lobbyId, address indexed joiner);
     event LobbyUnjoined(uint256 lobbyId);
     event LobbyEnded(uint256 lobbyId, address indexed winner, uint256 timestamp);
+    event CatapultInited(uint256 lobbyId, address indexed user, uint256 catapultIndex);
+    event CatapultResult(uint256 lobbyId, address indexed user, uint256 catapultIndex, bool isOnTarget);
 
     modifier notStarted(uint256 lobbyId) {
         require(lobbies[lobbyId].startTime > block.timestamp, "Lobby is alredy started");
@@ -93,14 +128,35 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         _;
     }
 
-    function initialize(IERC20Upgradeable _mead, address _feeTo, uint256 _feePercentage) external initializer {
+    modifier isValidCatapult(uint256 catapultIndex) {
+        require(catapultIndex < catapults.length, "Invalid catapult index");
+        _;
+    }
+
+    function initialize(
+        IERC20Upgradeable _mead,
+        address _feeTo,
+        uint256 _feePercentage,
+        address _vrfCoordinator,
+        address _link,
+        bytes32 _keyHash,
+        uint256 _randomFee
+    ) external initializer {
         __ERC721Enumerable_init();
         __Ownable_init();
         __ERC721_init("BvBGame Lobby", "BvB");
+        __VRFConsumerBase_init(_vrfCoordinator, _link);
+
+        randomFee = _randomFee;
+        keyHash = _keyHash;
 
         mead = _mead;
         feeTo = _feeTo;
         feePercentage = _feePercentage;
+
+        catapults.push(Catapult(3000, 10));
+        catapults.push(Catapult(6000, 20));
+        catapults.push(Catapult(9000, 30));
     }
 
     //////////////////////////////////////////////////////////////////////
@@ -263,8 +319,9 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
                 return 0;
             }
             uint256 _flowedMead = (lastGameTime - brewery.lastUpdatedAt) * brewery.flowRatePerSecond;
-            if (_flowedMead > brewery.mead) {
-                _flowedMead = brewery.mead;
+            uint256 meadInBrewery = brewery.mead + pendingMead(lobbyId, owner);
+            if (_flowedMead > brewery.mead + meadInBrewery) {
+                _flowedMead = brewery.mead + meadInBrewery;
             }
             return _flowedMead;
         }
@@ -292,6 +349,58 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         brewery.lastUpdatedAt = block.timestamp;
     }
 
+    //////////////////////////////////////////////////////////////////////
+    //                                                                  //
+    //                      Catapult/Pipe Logic                         //
+    //                                                                  //
+    //////////////////////////////////////////////////////////////////////
+
+    /**
+     * @notice Buy catapults
+     * @dev Use catapults using points
+     */
+    function useCatapult(uint256 lobbyId, uint256 catapultIndex) external isInProgress(lobbyId) isValidCatapult(catapultIndex) {
+        Lobby memory lobby = lobbies[lobbyId];
+        require(ownerOf(lobbyId) == _msgSender() || lobby.joiner == _msgSender(), "Not part of the game");
+
+        address opponent = ownerOf(lobbyId);
+        if (_msgSender() == ownerOf(lobbyId)) {
+            opponent = lobby.joiner;
+        }
+        BreweryStatus storage brewery = breweries[lobbyId][_msgSender()];
+        brewery.points = brewery.points - catapults[catapultIndex].pointsNeeded;
+
+        bytes32 requestId = requestRandomness(keyHash, randomFee);
+        vrfRequests[requestId] = CatapultRandomInfo(opponent, lobbyId, catapultIndex);
+
+        emit CatapultInited(lobbyId, _msgSender(), catapultIndex);
+    }
+
+    /**
+     * @dev Callback function used by VRF Coordinator
+     *
+     * We process random catapult here
+     *
+     */
+    function fulfillRandomness(bytes32 requestId, uint256 randomness) internal override {
+        CatapultRandomInfo memory randomInfo = vrfRequests[requestId];
+        delete vrfRequests[requestId];
+
+        bool isOnTarget = randomness % 100 < catapults[randomInfo.catapultIndex].chance / 100;
+        if (isOnTarget) {
+            BreweryStatus storage brewery = breweries[randomInfo.lobbyId][randomInfo.user];
+            brewery.flowRatePerSecond = brewery.flowRatePerSecond / 2;
+        }
+
+        emit CatapultResult(randomInfo.lobbyId, randomInfo.user, randomInfo.catapultIndex, isOnTarget);
+    }
+
+    /**
+     * @dev Repair pipe; is pipe destroyed or not?
+     */
+    function repairPipe() external {
+
+    }
 
     //////////////////////////////////////////////////////////////////////
     //                                                                  //
