@@ -24,6 +24,8 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         uint256 meadPerSecond;
         // Flow rate of mead
         uint256 flowRatePerSecond;
+        // Normal flow rate
+        uint256 normalFlowRate;
         // Points Per second
         uint256 pointsPerSecond;
     }
@@ -80,6 +82,9 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
     /// @notice catapults info
     Catapult[] public catapults;
 
+    // Points for repair once
+    uint256 public repairPointPerFlowRate;
+
     // VRF info
 
     // Chainlink VRF fee which varies by network
@@ -91,7 +96,6 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
     // Chainlink VRF requestId => catapult random info
     mapping(bytes32 => CatapultRandomInfo) internal vrfRequests;
 
-
     event LobbyCreated(uint256 lobbyId, address indexed creator, uint256 startTime, uint256 amount);
     event LobbyUpdated(uint256 lobbyId, uint256 startTime);
     event LobbyCanceled(uint256 lobbyId);
@@ -100,6 +104,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
     event LobbyEnded(uint256 lobbyId, address indexed winner, uint256 timestamp);
     event CatapultInited(uint256 lobbyId, address indexed user, uint256 catapultIndex);
     event CatapultResult(uint256 lobbyId, address indexed user, uint256 catapultIndex, bool isOnTarget);
+    event RepairPipe(uint256 lobbyId, address indexed user, uint256 flowRateAfter, uint256 pointsAfter);
 
     modifier notStarted(uint256 lobbyId) {
         require(lobbies[lobbyId].startTime > block.timestamp, "Lobby is alredy started");
@@ -200,6 +205,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      */
     function updateStartTime(uint256 lobbyId, uint256 _startTime) external notCanceled(lobbyId) notStarted(lobbyId) onlyLobbyOwner(lobbyId) {
         lobbies[lobbyId].startTime = _startTime;
+        lobbies[lobbyId].endTime = _startTime + GAME_DURATION;
 
         emit LobbyUpdated(lobbyId, _startTime);
     }
@@ -386,6 +392,8 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         CatapultRandomInfo memory randomInfo = vrfRequests[requestId];
         delete vrfRequests[requestId];
 
+        _updateBrewery(randomInfo.lobbyId, randomInfo.user);
+
         bool isOnTarget = randomness % 100 < catapults[randomInfo.catapultIndex].chance / 100;
         if (isOnTarget) {
             BreweryStatus storage brewery = breweries[randomInfo.lobbyId][randomInfo.user];
@@ -398,8 +406,21 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
     /**
      * @dev Repair pipe; is pipe destroyed or not?
      */
-    function repairPipe() external {
+    function repairPipe(uint256 lobbyId) external isInProgress(lobbyId) {
+        _updateBrewery(lobbyId, _msgSender());
 
+        BreweryStatus storage brewery = breweries[lobbyId][_msgSender()];
+        require(brewery.normalFlowRate > brewery.flowRatePerSecond, "Not destoryed");
+        uint256 neededPoints = (brewery.normalFlowRate - brewery.flowRatePerSecond) * repairPointPerFlowRate;
+        if (brewery.points > neededPoints) {
+            brewery.points = brewery.points - neededPoints;
+            brewery.flowRatePerSecond = brewery.normalFlowRate;
+        } else {
+            brewery.flowRatePerSecond = brewery.flowRatePerSecond + brewery.points / repairPointPerFlowRate;
+            brewery.points = 0;
+        }
+
+        emit RepairPipe(lobbyId, _msgSender(), brewery.flowRatePerSecond, brewery.points);
     }
 
     //////////////////////////////////////////////////////////////////////
@@ -441,6 +462,10 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
     function claimToWinner(uint256 lobbyId) external {
         (address winner, bool canbeFinal) = winnerOfGame(lobbyId);
         Lobby storage lobby = lobbies[lobbyId];
+
+        _updateBrewery(lobbyId, ownerOf(lobbyId));
+        _updateBrewery(lobbyId, lobby.joiner);
+
         require(canbeFinal, "You're not final winner yet");
         require(lobby.claimedTo == address(0), "Already claimed");
         lobby.claimedTo = winner;
