@@ -214,8 +214,10 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      * @notice Cancel game
      * @dev If there's a person joined, return his mead token as well
      */
-    function cancelLobby(uint256 lobbyId) external notCanceled(lobbyId) notStarted(lobbyId) onlyLobbyOwner(lobbyId) {
+    function cancelLobby(uint256 lobbyId) external notCanceled(lobbyId) onlyLobbyOwner(lobbyId) {
         Lobby storage lobby = lobbies[lobbyId];
+        require(lobby.startTime > block.timestamp || lobby.joiner == address(0), "Lobby is alredy started");
+
         lobby.isCanceled = true;
         mead.transfer(_msgSender(), lobby.betAmount);
 
