@@ -64,6 +64,19 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
     /// @notice duration of the game: 5 mins
     uint256 public constant GAME_DURATION = 5 minutes;
 
+    /// Standard params
+
+    /// @notice Normal Flow rate
+    uint256 public normalFlowRate;
+
+    /// @notice Normal Flow rate
+    uint256 public normalMeadPerSecond;
+
+    /// @notice Normal Flow rate
+    uint256 public normalPointsPerSecond;
+
+    /// Status
+
     /// @notice lobbies data
     mapping(uint256 => Lobby) public lobbies;
 
@@ -162,6 +175,10 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         catapults.push(Catapult(3000, 10));
         catapults.push(Catapult(6000, 20));
         catapults.push(Catapult(9000, 30));
+
+        normalFlowRate = 10;
+        normalMeadPerSecond = 10;
+        normalPointsPerSecond = 10;
     }
 
     //////////////////////////////////////////////////////////////////////
@@ -195,6 +212,11 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         lobbies[newId] = Lobby(address(0), false, startTime, startTime + GAME_DURATION, betAmount, address(0));
 
         mead.transferFrom(_msgSender(), address(this), betAmount);
+
+        breweries[newId][_msgSender()].normalFlowRate = normalFlowRate;
+        breweries[newId][_msgSender()].flowRatePerSecond = normalFlowRate;
+        breweries[newId][_msgSender()].meadPerSecond = normalMeadPerSecond;
+        breweries[newId][_msgSender()].pointsPerSecond = normalPointsPerSecond;
         
         emit LobbyCreated(newId, _msgSender(), startTime, betAmount);
     }
@@ -236,6 +258,11 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         Lobby storage lobby = lobbies[lobbyId];
         lobby.joiner = _msgSender();
         mead.transferFrom(_msgSender(), address(this), lobby.betAmount);
+
+        breweries[lobbyId][_msgSender()].normalFlowRate = normalFlowRate;
+        breweries[lobbyId][_msgSender()].flowRatePerSecond = normalFlowRate;
+        breweries[lobbyId][_msgSender()].meadPerSecond = normalMeadPerSecond;
+        breweries[lobbyId][_msgSender()].pointsPerSecond = normalPointsPerSecond;
 
         emit LobbyJoined(lobbyId, _msgSender());
     }
