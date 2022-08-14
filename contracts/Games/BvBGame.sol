@@ -256,6 +256,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      */
     function joinLobby(uint256 lobbyId) external notCanceled(lobbyId) notStarted(lobbyId) notJoined(lobbyId) {
         Lobby storage lobby = lobbies[lobbyId];
+        require(ownerOf(lobbyId) != _msgSender(), "You can't join your own game");
         lobby.joiner = _msgSender();
         mead.transferFrom(_msgSender(), address(this), lobby.betAmount);
 
