@@ -195,6 +195,13 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         feePercentage = _feePercentage;
     }    
 
+    /**
+     * @dev Withdraw LINK tokens`
+     */
+    function withdrawLINK(address to, uint256 amount) public onlyOwner {
+        LINK.transfer(to, amount);
+    }
+
     //////////////////////////////////////////////////////////////////////
     //                                                                  //
     //                          Lobby Management                        //
@@ -406,6 +413,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         BreweryStatus storage brewery = breweries[lobbyId][_msgSender()];
         brewery.points = brewery.points - catapults[catapultIndex].pointsNeeded;
 
+        require(LINK.balanceOf(address(this)) >= randomFee, "Not enough LINK - fill contract with faucet");
         bytes32 requestId = requestRandomness(keyHash, randomFee);
         vrfRequests[requestId] = CatapultRandomInfo(opponent, lobbyId, catapultIndex);
 
