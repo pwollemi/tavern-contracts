@@ -41,8 +41,8 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         uint256 endTime;
         // amount in mead
         uint256 betAmount;
-        // winner claimed
-        address claimedTo;
+        // winner claimed; or each claimed in a draw
+        bool isClaimed;
     }
 
     struct Catapult {
@@ -209,7 +209,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         require(startTime > block.timestamp, "startTime must be in the future");
         uint256 newId = totalSupply() + 1;
         _mint(_msgSender(), newId);
-        lobbies[newId] = Lobby(address(0), false, startTime, startTime + GAME_DURATION, betAmount, address(0));
+        lobbies[newId] = Lobby(address(0), false, startTime, startTime + GAME_DURATION, betAmount, false);
 
         mead.transferFrom(_msgSender(), address(this), betAmount);
 
@@ -486,7 +486,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
     }
 
     /**
-     * @notice Current winner of the game
+     * @notice Claimed by the winner or by one of them when draw
      * @dev If game is ended, this will return final winner of the lobby; return 0 if both the same
      */
     function claimToWinner(uint256 lobbyId) external {
@@ -497,16 +497,22 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         _updateBrewery(lobbyId, lobby.joiner);
 
         require(canbeFinal, "You're not final winner yet");
-        require(lobby.claimedTo == address(0), "Already claimed");
-        lobby.claimedTo = winner;
+        require(lobby.isClaimed == false, "Already claimed");
+        lobby.isClaimed = true;
         if (lobby.endTime > block.timestamp) {
             lobby.endTime = block.timestamp;
         }
 
         uint256 totalAmount = lobby.betAmount * 2;
         uint256 feeAmount = totalAmount * feePercentage / 1e4;
-        mead.transfer(winner, totalAmount - feeAmount);
+        uint256 claimAmount = totalAmount - feeAmount;
         mead.transfer(feeTo, feeAmount);
+        if (winner != address(0)) {
+            mead.transfer(winner, claimAmount);
+        } else {
+            mead.transfer(lobby.joiner, claimAmount / 2);
+            mead.transfer(ownerOf(lobbyId), claimAmount / 2);
+        }
 
         emit LobbyEnded(lobbyId, winner, block.timestamp);
     }
