@@ -6,9 +6,10 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
-import "../chainlink/VRFConsumerBaseUpgradeable.sol";
+import "../chainlink/VRFConsumerBaseV2Upgradeable.sol";
+import "../chainlink/interfaces/IVRFCoordinatorV2.sol";
 
-contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeable, VRFConsumerBaseUpgradeable {
+contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeable, VRFConsumerBaseV2Upgradeable {
     struct BreweryStatus {
         // Mead amount in Brewery; it's not total mead, should add pending mead for total mead
         uint256 mead;
@@ -100,14 +101,17 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
 
     // VRF info
 
-    // Chainlink VRF fee which varies by network
-    uint256 internal randomFee;
-
     // Chainlink VRF Key Hash which varies by network
     bytes32 internal keyHash;
 
+    // VRF Coordinator
+    address internal vrfCoordinator;
+
+    // Subscription ID
+    uint64 public vrfSubId;
+
     // Chainlink VRF requestId => catapult random info
-    mapping(bytes32 => CatapultRandomInfo) internal vrfRequests;
+    mapping(uint256 => CatapultRandomInfo) internal vrfRequests;
 
     event LobbyCreated(uint256 lobbyId, address indexed creator, uint256 startTime, uint256 amount);
     event LobbyUpdated(uint256 lobbyId, uint256 startTime);
@@ -156,17 +160,17 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         address _feeTo,
         uint256 _feePercentage,
         address _vrfCoordinator,
-        address _link,
         bytes32 _keyHash,
-        uint256 _randomFee
+        uint64 _subId
     ) external initializer {
         __ERC721Enumerable_init();
         __Ownable_init();
         __ERC721_init("BvBGame Lobby", "BvB");
-        __VRFConsumerBase_init(_vrfCoordinator, _link);
+        __VRFConsumerBaseV2_init(_vrfCoordinator);
 
-        randomFee = _randomFee;
         keyHash = _keyHash;
+        vrfCoordinator = _vrfCoordinator;
+        vrfSubId = _subId;
 
         mead = _mead;
         feeTo = _feeTo;
@@ -193,13 +197,13 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
     function setFeeInfo(address _feeTo, uint256 _feePercentage) external onlyOwner {
         feeTo = _feeTo;
         feePercentage = _feePercentage;
-    }    
+    }
 
     /**
-     * @dev Withdraw LINK tokens`
+     * @notice Set subscription id
      */
-    function withdrawLINK(address to, uint256 amount) public onlyOwner {
-        LINK.transfer(to, amount);
+    function setVRFSubId(uint64 _subId) external onlyOwner {
+        vrfSubId = _subId;
     }
 
     //////////////////////////////////////////////////////////////////////
@@ -413,8 +417,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         BreweryStatus storage brewery = breweries[lobbyId][_msgSender()];
         brewery.points = brewery.points - catapults[catapultIndex].pointsNeeded;
 
-        require(LINK.balanceOf(address(this)) >= randomFee, "Not enough LINK - fill contract with faucet");
-        bytes32 requestId = requestRandomness(keyHash, randomFee);
+        uint256 requestId = IVRFCoordinatorV2(vrfCoordinator).requestRandomWords(keyHash, vrfSubId, 1, 2500000, 1);
         vrfRequests[requestId] = CatapultRandomInfo(opponent, lobbyId, catapultIndex);
 
         emit CatapultInited(lobbyId, _msgSender(), catapultIndex);
@@ -426,7 +429,9 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      * We process random catapult here
      *
      */
-    function fulfillRandomness(bytes32 requestId, uint256 randomness) internal override {
+    function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
+        uint256 randomness = randomWords[1];
+
         CatapultRandomInfo memory randomInfo = vrfRequests[requestId];
         delete vrfRequests[requestId];
 
