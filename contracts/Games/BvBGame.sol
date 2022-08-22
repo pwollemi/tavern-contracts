@@ -519,7 +519,9 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         uint256 totalAmount = lobby.betAmount * 2;
         uint256 feeAmount = totalAmount * feePercentage / 1e4;
         uint256 claimAmount = totalAmount - feeAmount;
-        mead.transfer(feeTo, feeAmount);
+        if (feeAmount > 0) {
+            mead.transfer(feeTo, feeAmount);
+        }
         if (winner != address(0)) {
             mead.transfer(winner, claimAmount);
         } else {
