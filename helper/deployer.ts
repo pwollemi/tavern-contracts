@@ -21,6 +21,12 @@ async function deployProxy(name: string, ...constructorArgs: any[]) : Promise<an
     return contract;
 }
 
+async function upgradeProxy(proxy: string, name: string, ...constructorArgs: any[]) : Promise<any> {
+    const factory = await ethers.getContractFactory(name);
+    const contract = await upgrades.upgradeProxy(proxy, factory);
+    return contract;
+}
+
 async function deployAndVerifyProxy(name: string, ...constructorArgs: any[]) : Promise<any> {
     const contract = await deployProxy(name, ...constructorArgs);
     await hre.run("verify:verify", {
