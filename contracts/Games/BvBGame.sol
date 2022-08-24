@@ -430,7 +430,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      *
      */
     function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
-        uint256 randomness = randomWords[1];
+        uint256 randomness = randomWords[0];
 
         CatapultRandomInfo memory randomInfo = vrfRequests[requestId];
         delete vrfRequests[requestId];
