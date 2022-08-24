@@ -207,6 +207,13 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         vrfSubId = _subId;
     }
 
+    /**
+     * @notice Set repairPointPerFlowRate
+     */
+    function setRepairPointPerFlowRate(uint256 _repairPointPerFlowRate) external onlyOwner {
+        repairPointPerFlowRate = _repairPointPerFlowRate;
+    }
+
     //////////////////////////////////////////////////////////////////////
     //                                                                  //
     //                          Lobby Management                        //
