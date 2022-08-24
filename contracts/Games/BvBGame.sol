@@ -183,6 +183,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         normalFlowRate = 10;
         normalMeadPerSecond = 10;
         normalPointsPerSecond = 10;
+        repairPointPerFlowRate = 100;
     }
 
     //////////////////////////////////////////////////////////////////////
