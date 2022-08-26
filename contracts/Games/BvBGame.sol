@@ -415,6 +415,8 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      * @dev Use catapults using points
      */
     function useCatapult(uint256 lobbyId, uint256 catapultIndex) external isInProgress(lobbyId) isValidCatapult(catapultIndex) {
+        _updateBrewery(lobbyId, _msgSender());
+
         Lobby memory lobby = lobbies[lobbyId];
         require(ownerOf(lobbyId) == _msgSender() || lobby.joiner == _msgSender(), "Not part of the game");
 
