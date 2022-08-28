@@ -236,6 +236,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         breweries[newId][_msgSender()].flowRatePerSecond = normalFlowRate;
         breweries[newId][_msgSender()].meadPerSecond = normalMeadPerSecond;
         breweries[newId][_msgSender()].pointsPerSecond = normalPointsPerSecond;
+        breweries[newId][_msgSender()].lastUpdatedAt = startTime;
         
         emit LobbyCreated(newId, _msgSender(), startTime, betAmount);
     }
@@ -283,6 +284,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         breweries[lobbyId][_msgSender()].flowRatePerSecond = normalFlowRate;
         breweries[lobbyId][_msgSender()].meadPerSecond = normalMeadPerSecond;
         breweries[lobbyId][_msgSender()].pointsPerSecond = normalPointsPerSecond;
+        breweries[lobbyId][_msgSender()].lastUpdatedAt = lobby.startTime;
 
         emit LobbyJoined(lobbyId, _msgSender());
     }
