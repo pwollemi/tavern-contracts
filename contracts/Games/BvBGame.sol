@@ -426,6 +426,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         if (_msgSender() == ownerOf(lobbyId)) {
             opponent = lobby.joiner;
         }
+        require(breweries[lobbyId][opponent].flowRatePerSecond == breweries[lobbyId][opponent].normalFlowRate, "Already broken");
         BreweryStatus storage brewery = breweries[lobbyId][_msgSender()];
         brewery.points = brewery.points - catapults[catapultIndex].pointsNeeded;
 
