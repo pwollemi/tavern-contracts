@@ -452,7 +452,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         bool isOnTarget = randomness % 100 < catapults[randomInfo.catapultIndex].chance / 100;
         if (isOnTarget) {
             BreweryStatus storage brewery = breweries[randomInfo.lobbyId][randomInfo.user];
-            brewery.flowRatePerSecond = brewery.flowRatePerSecond / 2;
+            brewery.flowRatePerSecond = (brewery.flowRatePerSecond + 1) / 2;
         }
 
         emit CatapultResult(randomInfo.lobbyId, randomInfo.user, randomInfo.catapultIndex, isOnTarget);
@@ -467,13 +467,9 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         BreweryStatus storage brewery = breweries[lobbyId][_msgSender()];
         require(brewery.normalFlowRate > brewery.flowRatePerSecond, "Not destoryed");
         uint256 neededPoints = (brewery.normalFlowRate - brewery.flowRatePerSecond) * repairPointPerFlowRate;
-        if (brewery.points > neededPoints) {
-            brewery.points = brewery.points - neededPoints;
-            brewery.flowRatePerSecond = brewery.normalFlowRate;
-        } else {
-            brewery.flowRatePerSecond = brewery.flowRatePerSecond + brewery.points / repairPointPerFlowRate;
-            brewery.points = 0;
-        }
+        require(brewery.points > neededPoints, "Points not enough for repair");
+        brewery.points = brewery.points - neededPoints;
+        brewery.flowRatePerSecond = brewery.normalFlowRate;
 
         emit RepairPipe(lobbyId, _msgSender(), brewery.flowRatePerSecond, brewery.points);
     }
