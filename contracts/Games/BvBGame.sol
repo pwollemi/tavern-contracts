@@ -176,9 +176,9 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         feeTo = _feeTo;
         feePercentage = _feePercentage;
 
-        catapults.push(Catapult(3000, 10));
-        catapults.push(Catapult(6000, 20));
-        catapults.push(Catapult(9000, 30));
+        catapults.push(Catapult(3000, 100));
+        catapults.push(Catapult(6000, 250));
+        catapults.push(Catapult(9000, 500));
 
         normalFlowRate = 10;
         normalMeadPerSecond = 10;
@@ -212,6 +212,16 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      */
     function setRepairPointPerFlowRate(uint256 _repairPointPerFlowRate) external onlyOwner {
         repairPointPerFlowRate = _repairPointPerFlowRate;
+    }
+
+    function clearCatapults() external onlyOwner {
+        catapults = [];
+    }
+
+    function addCatapults() external onlyOwner {
+        catapults.push(Catapult(3000, 100));
+        catapults.push(Catapult(6000, 250));
+        catapults.push(Catapult(9000, 500));
     }
 
     //////////////////////////////////////////////////////////////////////
