@@ -377,8 +377,8 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
             }
             uint256 _flowedMead = (lastGameTime - brewery.lastUpdatedAt) * brewery.flowRatePerSecond;
             uint256 meadInBrewery = brewery.mead + pendingMead(lobbyId, owner);
-            if (_flowedMead > brewery.mead + meadInBrewery) {
-                _flowedMead = brewery.mead + meadInBrewery;
+            if (_flowedMead > meadInBrewery) {
+                _flowedMead = meadInBrewery;
             }
             return _flowedMead;
         }
