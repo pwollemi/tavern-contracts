@@ -215,7 +215,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
     }
 
     function clearCatapults() external onlyOwner {
-        catapults = [];
+        delete catapults;
     }
 
     function addCatapults() external onlyOwner {
