@@ -411,7 +411,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
     function _updateBrewery(uint256 lobbyId, address owner) internal {
         BreweryStatus storage brewery = breweries[lobbyId][owner];
         brewery.mead = totalMead(lobbyId, owner);
-        brewery.points = pendingPoints(lobbyId, owner);
+        brewery.points = brewery.points + pendingPoints(lobbyId, owner);
         brewery.outMead = meadFromBrewery(lobbyId, owner);
         brewery.lastUpdatedAt = block.timestamp;
     }
