@@ -333,7 +333,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      * @dev it's only flowed mead since lastUpdatedAt
      */
     function toggleLever(uint256 lobbyId, bool isValveOpened) public isInProgress(lobbyId) {
-        _updateBrewery(lobbyId, _msgSender());
+        _updateLobby(lobbyId);
 
         Lobby memory lobby = lobbies[lobbyId];
         require(ownerOf(lobbyId) == _msgSender() || lobby.joiner == _msgSender(), "Not part of the game");
@@ -416,6 +416,15 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         brewery.lastUpdatedAt = block.timestamp;
     }
 
+    /**
+     * @notice Update mead amount produced in Brewery
+     * @dev Convert pending mead into stored mead amount
+     */
+    function _updateLobby(uint256 lobbyId) internal {
+        Lobby memory lobby = lobbies[lobbyId];
+        _updateBrewery(lobbyId, ownerOf(lobbyId));
+        _updateBrewery(lobbyId, lobby.joiner);
+    }
     //////////////////////////////////////////////////////////////////////
     //                                                                  //
     //                      Catapult/Pipe Logic                         //
@@ -427,7 +436,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      * @dev Use catapults using points
      */
     function useCatapult(uint256 lobbyId, uint256 catapultIndex) external isInProgress(lobbyId) isValidCatapult(catapultIndex) {
-        _updateBrewery(lobbyId, _msgSender());
+        _updateLobby(lobbyId);
 
         Lobby memory lobby = lobbies[lobbyId];
         require(ownerOf(lobbyId) == _msgSender() || lobby.joiner == _msgSender(), "Not part of the game");
@@ -458,7 +467,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         CatapultRandomInfo memory randomInfo = vrfRequests[requestId];
         delete vrfRequests[requestId];
 
-        _updateBrewery(randomInfo.lobbyId, randomInfo.user);
+        _updateLobby(randomInfo.lobbyId);
 
         bool isOnTarget = randomness % 100 < catapults[randomInfo.catapultIndex].chance / 100;
         if (isOnTarget) {
@@ -473,7 +482,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      * @dev Repair pipe; is pipe destroyed or not?
      */
     function repairPipe(uint256 lobbyId) external isInProgress(lobbyId) {
-        _updateBrewery(lobbyId, _msgSender());
+        _updateLobby(lobbyId);
 
         BreweryStatus storage brewery = breweries[lobbyId][_msgSender()];
         require(brewery.normalFlowRate > brewery.flowRatePerSecond, "Not destoryed");
@@ -525,8 +534,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         (address winner, bool canbeFinal) = winnerOfGame(lobbyId);
         Lobby storage lobby = lobbies[lobbyId];
 
-        _updateBrewery(lobbyId, ownerOf(lobbyId));
-        _updateBrewery(lobbyId, lobby.joiner);
+        _updateLobby(lobbyId);
 
         require(canbeFinal, "You're not final winner yet");
         require(lobby.isClaimed == false, "Already claimed");
