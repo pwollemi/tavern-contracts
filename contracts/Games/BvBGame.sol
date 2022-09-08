@@ -343,7 +343,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
             if (brewery.lastUpdatedAt > lastGameTime) {
                 return 0;
             }
-            return (lastGameTime - brewery.lastUpdatedAt) * brewery.meadPerSecond;
+            return (lastGameTime - brewery.lastUpdatedAt) * brewery.flowRatePerSecond;
         }
         return 0;
     }
