@@ -13,8 +13,6 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
     struct BreweryStatus {
         // Mead amount in Brewery; it's not total mead, should add pending mead for total mead
         uint256 mead;
-        // Mead amount out from Brewery; should add flowed mead
-        uint256 outMead;
         // Points gained by Brewery
         uint256 points;
         // Valve close/open status
@@ -313,20 +311,6 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         emit LobbyUnjoined(lobbyId);
     }
 
-    //////////////////////////////////////////////////////////////////////
-    //                                                                  //
-    //                          Game Logic                              //
-    //                                                                  //
-    //////////////////////////////////////////////////////////////////////
-
-    /**
-     * @notice Mead amount inside Brewery
-     * @dev totalMead = stored Mead + pending Mead - Flowed Mead
-     */
-    function totalMead(uint256 lobbyId, address owner) public view returns (uint256) {
-        BreweryStatus memory brewery = breweries[lobbyId][owner];
-        return brewery.mead + pendingMead(lobbyId, owner) - flowedMead(lobbyId, owner);
-    }
 
     /**
      * @notice Open/close mead lever
@@ -342,13 +326,19 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         brewery.isValveOpened = isValveOpened;
     }
 
+    //////////////////////////////////////////////////////////////////////
+    //                                                                  //
+    //                          Game Logic                              //
+    //                                                                  //
+    //////////////////////////////////////////////////////////////////////
+
     /**
      * @notice Mead amount produced in Brewery
      * @dev it's only produced amount
      */
     function pendingMead(uint256 lobbyId, address owner) public view returns (uint256) {
         BreweryStatus memory brewery = breweries[lobbyId][owner];
-        if (!brewery.isValveOpened) {
+        if (brewery.isValveOpened) {
             uint256 lastGameTime = lobbies[lobbyId].endTime > block.timestamp ? block.timestamp : lobbies[lobbyId].endTime;
             if (brewery.lastUpdatedAt > lastGameTime) {
                 return 0;
@@ -356,6 +346,15 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
             return (lastGameTime - brewery.lastUpdatedAt) * brewery.meadPerSecond;
         }
         return 0;
+    }
+
+    /**
+     * @notice Mead amount inside Brewery produced so far
+     * @dev totalMead = stored Mead + pending Mead
+     */
+    function totalMead(uint256 lobbyId, address owner) public view returns (uint256) {
+        BreweryStatus memory brewery = breweries[lobbyId][owner];
+        return brewery.mead + pendingMead(lobbyId, owner);
     }
 
     /**
@@ -375,33 +374,11 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
     }
 
     /**
-     * @notice Mead amount flowed after lastUpdatedAt
-     * @dev it's only flowed mead since lastUpdatedAt, but if exceeds the stored Mead, should return zero
+     * @notice Total points inside Brewery
      */
-    function flowedMead(uint256 lobbyId, address owner) public view returns (uint256) {
+    function totalPoints(uint256 lobbyId, address owner) public view returns (uint256) {
         BreweryStatus memory brewery = breweries[lobbyId][owner];
-        if (brewery.isValveOpened) {
-            uint256 lastGameTime = lobbies[lobbyId].endTime > block.timestamp ? block.timestamp : lobbies[lobbyId].endTime;
-            if (brewery.lastUpdatedAt > lastGameTime) {
-                return 0;
-            }
-            uint256 _flowedMead = (lastGameTime - brewery.lastUpdatedAt) * brewery.flowRatePerSecond;
-            uint256 meadInBrewery = brewery.mead + pendingMead(lobbyId, owner);
-            if (_flowedMead > meadInBrewery) {
-                _flowedMead = meadInBrewery;
-            }
-            return _flowedMead;
-        }
-        return 0;
-    }
-
-    /**
-     * @notice Mead amount flowed already
-     * @dev all mead out from brewery
-     */
-    function meadFromBrewery(uint256 lobbyId, address owner) public view returns (uint256) {
-        BreweryStatus memory brewery = breweries[lobbyId][owner];
-        return brewery.outMead + flowedMead(lobbyId, owner);
+        return brewery.points + pendingPoints(lobbyId, owner);
     }
 
     /**
@@ -410,9 +387,8 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      */
     function _updateBrewery(uint256 lobbyId, address owner) internal {
         BreweryStatus storage brewery = breweries[lobbyId][owner];
+        brewery.points = totalPoints(lobbyId, owner);
         brewery.mead = totalMead(lobbyId, owner);
-        brewery.points = brewery.points + pendingPoints(lobbyId, owner);
-        brewery.outMead = meadFromBrewery(lobbyId, owner);
         brewery.lastUpdatedAt = block.timestamp;
     }
 
@@ -425,6 +401,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         _updateBrewery(lobbyId, ownerOf(lobbyId));
         _updateBrewery(lobbyId, lobby.joiner);
     }
+
     //////////////////////////////////////////////////////////////////////
     //                                                                  //
     //                      Catapult/Pipe Logic                         //
@@ -507,8 +484,8 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
     function winnerOfGame(uint256 lobbyId) public view returns (address, bool) {
         address creator = ownerOf(lobbyId);
         address joiner = lobbies[lobbyId].joiner;
-        uint256 creatorLand = meadFromBrewery(lobbyId, creator);
-        uint256 joinerLand = meadFromBrewery(lobbyId, joiner);
+        uint256 creatorLand = totalMead(lobbyId, creator);
+        uint256 joinerLand = totalMead(lobbyId, joiner);
 
         bool canbeFinal = lobbies[lobbyId].endTime < block.timestamp;
         if (!canbeFinal) {
