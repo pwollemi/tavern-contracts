@@ -9,7 +9,12 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "../chainlink/VRFConsumerBaseV2Upgradeable.sol";
 import "../chainlink/interfaces/IVRFCoordinatorV2.sol";
 
-contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeable, VRFConsumerBaseV2Upgradeable {
+contract BvBGame is
+    Initializable,
+    OwnableUpgradeable,
+    ERC721EnumerableUpgradeable,
+    VRFConsumerBaseV2Upgradeable
+{
     struct BreweryStatus {
         // Mead amount in Brewery; it's not total mead, should add pending mead for total mead
         uint256 mead;
@@ -58,6 +63,16 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         uint256 lobbyId;
         // type of catapult
         uint256 catapultIndex;
+    }
+
+    struct GameStatus {
+        uint256 lobbyId;
+        address player;
+        uint256 points;
+        uint256 flows;
+        uint256 repairPoints;
+        bool valveOpen;
+        bool pipeBroken;
     }
 
     /// @notice duration of the game: 5 mins
@@ -111,18 +126,44 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
     // Chainlink VRF requestId => catapult random info
     mapping(uint256 => CatapultRandomInfo) internal vrfRequests;
 
-    event LobbyCreated(uint256 lobbyId, address indexed creator, uint256 startTime, uint256 amount);
+    event LobbyCreated(
+        uint256 lobbyId,
+        address indexed creator,
+        uint256 startTime,
+        uint256 amount
+    );
     event LobbyUpdated(uint256 lobbyId, uint256 startTime);
     event LobbyCanceled(uint256 lobbyId);
     event LobbyJoined(uint256 lobbyId, address indexed joiner);
     event LobbyUnjoined(uint256 lobbyId);
-    event LobbyEnded(uint256 lobbyId, address indexed winner, uint256 timestamp);
-    event CatapultInited(uint256 lobbyId, address indexed user, uint256 catapultIndex);
-    event CatapultResult(uint256 lobbyId, address indexed user, uint256 catapultIndex, bool isOnTarget);
-    event RepairPipe(uint256 lobbyId, address indexed user, uint256 flowRateAfter, uint256 pointsAfter);
+    event LobbyEnded(
+        uint256 lobbyId,
+        address indexed winner,
+        uint256 timestamp
+    );
+    event CatapultInited(
+        uint256 lobbyId,
+        address indexed user,
+        uint256 catapultIndex
+    );
+    event CatapultResult(
+        uint256 lobbyId,
+        address indexed user,
+        uint256 catapultIndex,
+        bool isOnTarget
+    );
+    event RepairPipe(
+        uint256 lobbyId,
+        address indexed user,
+        uint256 flowRateAfter,
+        uint256 pointsAfter
+    );
 
     modifier notStarted(uint256 lobbyId) {
-        require(lobbies[lobbyId].startTime > block.timestamp, "Lobby is alredy started");
+        require(
+            lobbies[lobbyId].startTime > block.timestamp,
+            "Lobby is alredy started"
+        );
         _;
     }
 
@@ -135,16 +176,20 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         require(lobbies[lobbyId].joiner == address(0), "Already joined");
         _;
     }
-    
+
     modifier onlyLobbyOwner(uint256 lobbyId) {
         require(ownerOf(lobbyId) == _msgSender(), "Must be lobby owner");
-        _;        
+        _;
     }
 
     modifier isInProgress(uint256 lobbyId) {
         require(lobbies[lobbyId].joiner != address(0), "Nobody joined");
         require(lobbies[lobbyId].isCanceled == false, "Lobby is canceled");
-        require(lobbies[lobbyId].startTime <= block.timestamp && lobbies[lobbyId].endTime > block.timestamp, "Lobby is not in progress");
+        require(
+            lobbies[lobbyId].startTime <= block.timestamp &&
+                lobbies[lobbyId].endTime > block.timestamp,
+            "Lobby is not in progress"
+        );
         _;
     }
 
@@ -193,7 +238,10 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
     /**
      * @notice Set fee info
      */
-    function setFeeInfo(address _feeTo, uint256 _feePercentage) external onlyOwner {
+    function setFeeInfo(address _feeTo, uint256 _feePercentage)
+        external
+        onlyOwner
+    {
         feeTo = _feeTo;
         feePercentage = _feePercentage;
     }
@@ -208,7 +256,10 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
     /**
      * @notice Set repairPointPerFlowRate
      */
-    function setRepairPointPerFlowRate(uint256 _repairPointPerFlowRate) external onlyOwner {
+    function setRepairPointPerFlowRate(uint256 _repairPointPerFlowRate)
+        external
+        onlyOwner
+    {
         repairPointPerFlowRate = _repairPointPerFlowRate;
     }
 
@@ -236,7 +287,14 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         require(startTime > block.timestamp, "startTime must be in the future");
         uint256 newId = totalSupply() + 1;
         _mint(_msgSender(), newId);
-        lobbies[newId] = Lobby(address(0), false, startTime, startTime + GAME_DURATION, betAmount, false);
+        lobbies[newId] = Lobby(
+            address(0),
+            false,
+            startTime,
+            startTime + GAME_DURATION,
+            betAmount,
+            false
+        );
 
         mead.transferFrom(_msgSender(), address(this), betAmount);
 
@@ -245,7 +303,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         breweries[newId][_msgSender()].meadPerSecond = normalMeadPerSecond;
         breweries[newId][_msgSender()].pointsPerSecond = normalPointsPerSecond;
         breweries[newId][_msgSender()].lastUpdatedAt = startTime;
-        
+
         emit LobbyCreated(newId, _msgSender(), startTime, betAmount);
     }
 
@@ -253,7 +311,12 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      * @notice Update game start time
      * @dev Emits update event
      */
-    function updateStartTime(uint256 lobbyId, uint256 _startTime) external notCanceled(lobbyId) notStarted(lobbyId) onlyLobbyOwner(lobbyId) {
+    function updateStartTime(uint256 lobbyId, uint256 _startTime)
+        external
+        notCanceled(lobbyId)
+        notStarted(lobbyId)
+        onlyLobbyOwner(lobbyId)
+    {
         lobbies[lobbyId].startTime = _startTime;
         lobbies[lobbyId].endTime = _startTime + GAME_DURATION;
 
@@ -264,9 +327,16 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      * @notice Cancel game
      * @dev If there's a person joined, return his mead token as well
      */
-    function cancelLobby(uint256 lobbyId) external notCanceled(lobbyId) onlyLobbyOwner(lobbyId) {
+    function cancelLobby(uint256 lobbyId)
+        external
+        notCanceled(lobbyId)
+        onlyLobbyOwner(lobbyId)
+    {
         Lobby storage lobby = lobbies[lobbyId];
-        require(lobby.startTime > block.timestamp || lobby.joiner == address(0), "Lobby is alredy started");
+        require(
+            lobby.startTime > block.timestamp || lobby.joiner == address(0),
+            "Lobby is alredy started"
+        );
 
         lobby.isCanceled = true;
         mead.transfer(_msgSender(), lobby.betAmount);
@@ -282,16 +352,25 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      * @notice Join game
      * @dev Emits join event
      */
-    function joinLobby(uint256 lobbyId) external notCanceled(lobbyId) notStarted(lobbyId) notJoined(lobbyId) {
+    function joinLobby(uint256 lobbyId)
+        external
+        notCanceled(lobbyId)
+        notStarted(lobbyId)
+        notJoined(lobbyId)
+    {
         Lobby storage lobby = lobbies[lobbyId];
-        require(ownerOf(lobbyId) != _msgSender(), "You can't join your own game");
+        require(
+            ownerOf(lobbyId) != _msgSender(),
+            "You can't join your own game"
+        );
         lobby.joiner = _msgSender();
         mead.transferFrom(_msgSender(), address(this), lobby.betAmount);
 
         breweries[lobbyId][_msgSender()].normalFlowRate = normalFlowRate;
         breweries[lobbyId][_msgSender()].flowRatePerSecond = normalFlowRate;
         breweries[lobbyId][_msgSender()].meadPerSecond = normalMeadPerSecond;
-        breweries[lobbyId][_msgSender()].pointsPerSecond = normalPointsPerSecond;
+        breweries[lobbyId][_msgSender()]
+            .pointsPerSecond = normalPointsPerSecond;
         breweries[lobbyId][_msgSender()].lastUpdatedAt = lobby.startTime;
 
         emit LobbyJoined(lobbyId, _msgSender());
@@ -301,26 +380,38 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      * @notice Unjoin game
      * @dev Emits unjoin event
      */
-    function unjoinLobby(uint256 lobbyId) external notCanceled(lobbyId) notStarted(lobbyId) {
+    function unjoinLobby(uint256 lobbyId)
+        external
+        notCanceled(lobbyId)
+        notStarted(lobbyId)
+    {
         Lobby storage lobby = lobbies[lobbyId];
         require(lobby.joiner == _msgSender(), "You're not joiner");
-        require(lobby.startTime > block.timestamp + 60, "Can't unjoin in less than 1 min");
+        require(
+            lobby.startTime > block.timestamp + 60,
+            "Can't unjoin in less than 1 min"
+        );
         lobby.joiner = address(0);
         mead.transfer(_msgSender(), lobby.betAmount);
 
         emit LobbyUnjoined(lobbyId);
     }
 
-
     /**
      * @notice Open/close mead lever
      * @dev it's only flowed mead since lastUpdatedAt
      */
-    function toggleLever(uint256 lobbyId, bool isValveOpened) public isInProgress(lobbyId) {
+    function toggleLever(uint256 lobbyId, bool isValveOpened)
+        public
+        isInProgress(lobbyId)
+    {
         _updateLobby(lobbyId);
 
         Lobby memory lobby = lobbies[lobbyId];
-        require(ownerOf(lobbyId) == _msgSender() || lobby.joiner == _msgSender(), "Not part of the game");
+        require(
+            ownerOf(lobbyId) == _msgSender() || lobby.joiner == _msgSender(),
+            "Not part of the game"
+        );
         BreweryStatus storage brewery = breweries[lobbyId][_msgSender()];
         require(brewery.isValveOpened != isValveOpened, "Same status update");
         brewery.isValveOpened = isValveOpened;
@@ -336,14 +427,22 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      * @notice Mead amount produced in Brewery
      * @dev it's only produced amount
      */
-    function pendingMead(uint256 lobbyId, address owner) public view returns (uint256) {
+    function pendingMead(uint256 lobbyId, address owner)
+        public
+        view
+        returns (uint256)
+    {
         BreweryStatus memory brewery = breweries[lobbyId][owner];
         if (brewery.isValveOpened) {
-            uint256 lastGameTime = lobbies[lobbyId].endTime > block.timestamp ? block.timestamp : lobbies[lobbyId].endTime;
+            uint256 lastGameTime = lobbies[lobbyId].endTime > block.timestamp
+                ? block.timestamp
+                : lobbies[lobbyId].endTime;
             if (brewery.lastUpdatedAt > lastGameTime) {
                 return 0;
             }
-            return (lastGameTime - brewery.lastUpdatedAt) * brewery.flowRatePerSecond;
+            return
+                (lastGameTime - brewery.lastUpdatedAt) *
+                brewery.flowRatePerSecond;
         }
         return 0;
     }
@@ -352,7 +451,11 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      * @notice Mead amount inside Brewery produced so far
      * @dev totalMead = stored Mead + pending Mead
      */
-    function totalMead(uint256 lobbyId, address owner) public view returns (uint256) {
+    function totalMead(uint256 lobbyId, address owner)
+        public
+        view
+        returns (uint256)
+    {
         BreweryStatus memory brewery = breweries[lobbyId][owner];
         return brewery.mead + pendingMead(lobbyId, owner);
     }
@@ -361,14 +464,22 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      * @notice Mead amount produced in Brewery
      * @dev it's only produced amount
      */
-    function pendingPoints(uint256 lobbyId, address owner) public view returns (uint256) {
+    function pendingPoints(uint256 lobbyId, address owner)
+        public
+        view
+        returns (uint256)
+    {
         BreweryStatus memory brewery = breweries[lobbyId][owner];
         if (!brewery.isValveOpened) {
-            uint256 lastGameTime = lobbies[lobbyId].endTime > block.timestamp ? block.timestamp : lobbies[lobbyId].endTime;
+            uint256 lastGameTime = lobbies[lobbyId].endTime > block.timestamp
+                ? block.timestamp
+                : lobbies[lobbyId].endTime;
             if (brewery.lastUpdatedAt > lastGameTime) {
                 return 0;
             }
-            return (lastGameTime - brewery.lastUpdatedAt) * brewery.pointsPerSecond;
+            return
+                (lastGameTime - brewery.lastUpdatedAt) *
+                brewery.pointsPerSecond;
         }
         return 0;
     }
@@ -376,7 +487,11 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
     /**
      * @notice Total points inside Brewery
      */
-    function totalPoints(uint256 lobbyId, address owner) public view returns (uint256) {
+    function totalPoints(uint256 lobbyId, address owner)
+        public
+        view
+        returns (uint256)
+    {
         BreweryStatus memory brewery = breweries[lobbyId][owner];
         return brewery.points + pendingPoints(lobbyId, owner);
     }
@@ -412,22 +527,38 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      * @notice Buy catapults
      * @dev Use catapults using points
      */
-    function useCatapult(uint256 lobbyId, uint256 catapultIndex) external isInProgress(lobbyId) isValidCatapult(catapultIndex) {
+    function useCatapult(uint256 lobbyId, uint256 catapultIndex)
+        external
+        isInProgress(lobbyId)
+        isValidCatapult(catapultIndex)
+    {
         _updateLobby(lobbyId);
 
         Lobby memory lobby = lobbies[lobbyId];
-        require(ownerOf(lobbyId) == _msgSender() || lobby.joiner == _msgSender(), "Not part of the game");
+        require(
+            ownerOf(lobbyId) == _msgSender() || lobby.joiner == _msgSender(),
+            "Not part of the game"
+        );
 
         address opponent = ownerOf(lobbyId);
         if (_msgSender() == ownerOf(lobbyId)) {
             opponent = lobby.joiner;
         }
-        require(breweries[lobbyId][opponent].flowRatePerSecond == breweries[lobbyId][opponent].normalFlowRate, "Already broken");
+        require(
+            breweries[lobbyId][opponent].flowRatePerSecond ==
+                breweries[lobbyId][opponent].normalFlowRate,
+            "Already broken"
+        );
         BreweryStatus storage brewery = breweries[lobbyId][_msgSender()];
         brewery.points = brewery.points - catapults[catapultIndex].pointsNeeded;
 
-        uint256 requestId = IVRFCoordinatorV2(vrfCoordinator).requestRandomWords(keyHash, vrfSubId, 1, 2500000, 1);
-        vrfRequests[requestId] = CatapultRandomInfo(opponent, lobbyId, catapultIndex);
+        uint256 requestId = IVRFCoordinatorV2(vrfCoordinator)
+            .requestRandomWords(keyHash, vrfSubId, 1, 2500000, 1);
+        vrfRequests[requestId] = CatapultRandomInfo(
+            opponent,
+            lobbyId,
+            catapultIndex
+        );
 
         emit CatapultInited(lobbyId, _msgSender(), catapultIndex);
     }
@@ -438,7 +569,10 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
      * We process random catapult here
      *
      */
-    function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
+    function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords)
+        internal
+        override
+    {
         uint256 randomness = randomWords[0];
 
         CatapultRandomInfo memory randomInfo = vrfRequests[requestId];
@@ -446,13 +580,21 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
 
         _updateLobby(randomInfo.lobbyId);
 
-        bool isOnTarget = randomness % 100 < catapults[randomInfo.catapultIndex].chance / 100;
+        bool isOnTarget = randomness % 100 <
+            catapults[randomInfo.catapultIndex].chance / 100;
         if (isOnTarget) {
-            BreweryStatus storage brewery = breweries[randomInfo.lobbyId][randomInfo.user];
+            BreweryStatus storage brewery = breweries[randomInfo.lobbyId][
+                randomInfo.user
+            ];
             brewery.flowRatePerSecond = (brewery.flowRatePerSecond + 1) / 2;
         }
 
-        emit CatapultResult(randomInfo.lobbyId, randomInfo.user, randomInfo.catapultIndex, isOnTarget);
+        emit CatapultResult(
+            randomInfo.lobbyId,
+            randomInfo.user,
+            randomInfo.catapultIndex,
+            isOnTarget
+        );
     }
 
     /**
@@ -462,13 +604,46 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         _updateLobby(lobbyId);
 
         BreweryStatus storage brewery = breweries[lobbyId][_msgSender()];
-        require(brewery.normalFlowRate > brewery.flowRatePerSecond, "Not destoryed");
-        uint256 neededPoints = (brewery.normalFlowRate - brewery.flowRatePerSecond) * repairPointPerFlowRate;
+        require(
+            brewery.normalFlowRate > brewery.flowRatePerSecond,
+            "Not destoryed"
+        );
+        uint256 neededPoints = (brewery.normalFlowRate -
+            brewery.flowRatePerSecond) * repairPointPerFlowRate;
         require(brewery.points > neededPoints, "Points not enough for repair");
         brewery.points = brewery.points - neededPoints;
         brewery.flowRatePerSecond = brewery.normalFlowRate;
 
-        emit RepairPipe(lobbyId, _msgSender(), brewery.flowRatePerSecond, brewery.points);
+        emit RepairPipe(
+            lobbyId,
+            _msgSender(),
+            brewery.flowRatePerSecond,
+            brewery.points
+        );
+    }
+
+    /**
+     * @dev Get all info needed by the frontend to show game status
+     */
+    function getGameStatus(uint256 lobbyId) public view returns(GameStatus memory owner,GameStatus memory joiner) {
+      address player1 =  ownerOf(lobbyId);
+      address player2 =  lobbies[lobbyId].joiner;
+      owner = getGameStatusByPlayer(lobbyId, player1);
+      joiner = getGameStatusByPlayer(lobbyId, player2);
+    }
+
+    /**
+     * @dev Get game info for one player
+     */
+    function getGameStatusByPlayer(uint256 lobbyId, address player) public view returns(GameStatus memory){
+      BreweryStatus memory brewery = breweries[lobbyId][player];
+      return GameStatus(lobbyId, 
+      player, 
+      brewery.points + pendingPoints(lobbyId, player),
+      totalMead(lobbyId, player),
+      (brewery.normalFlowRate - brewery.flowRatePerSecond) * repairPointPerFlowRate,
+      brewery.isValveOpened,
+      brewery.normalFlowRate > brewery.flowRatePerSecond);
     }
 
     //////////////////////////////////////////////////////////////////////
@@ -489,7 +664,8 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
 
         bool canbeFinal = lobbies[lobbyId].endTime < block.timestamp;
         if (!canbeFinal) {
-            uint256 creatorLandPercent = creatorLand * 100 / (creatorLand + joinerLand);
+            uint256 creatorLandPercent = (creatorLand * 100) /
+                (creatorLand + joinerLand);
             // Can be final if one has 95% of land
             canbeFinal = creatorLandPercent >= 95 || creatorLandPercent <= 5;
         }
@@ -521,7 +697,7 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
         }
 
         uint256 totalAmount = lobby.betAmount * 2;
-        uint256 feeAmount = totalAmount * feePercentage / 1e4;
+        uint256 feeAmount = (totalAmount * feePercentage) / 1e4;
         uint256 claimAmount = totalAmount - feeAmount;
         if (feeAmount > 0) {
             mead.transfer(feeTo, feeAmount);
@@ -535,4 +711,5 @@ contract BvBGame is Initializable, OwnableUpgradeable, ERC721EnumerableUpgradeab
 
         emit LobbyEnded(lobbyId, winner, block.timestamp);
     }
+
 }
